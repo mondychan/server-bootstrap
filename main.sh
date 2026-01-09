@@ -116,7 +116,13 @@ run_module_by_path() {
   fi
 
   log "Running '${module_id}' - ${module_desc}"
-  module_run
+  module_run 2>&1 | while IFS= read -r line; do
+    echo "[bootstrap:${module_id}] ${line}"
+  done
+  local rc=${PIPESTATUS[0]}
+  if [[ "$rc" -ne 0 ]]; then
+    exit "$rc"
+  fi
   log "Done '${module_id}'"
 }
 
