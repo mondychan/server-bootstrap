@@ -147,7 +147,7 @@ run_interactive() {
     exit 0
   fi
 
-  if [[ "${choice}" == "all" ]]; then
+  if [[ "${choice,,}" == "all" || "${choice}" == "A" || "${choice}" == "a" ]]; then
     selected_ids=("${ids[@]}")
   else
     IFS=', ' read -r -a choice_arr <<< "${choice}"
