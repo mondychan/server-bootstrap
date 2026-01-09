@@ -17,8 +17,8 @@ module_run() {
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y ca-certificates curl gnupg
+    apt-get -qq update
+    apt-get -y -o Dpkg::Progress-Fancy=1 install ca-certificates curl gnupg
 
     echo "Removing legacy Webmin repo entries"
     # Remove legacy/unsupported Webmin repo definitions (e.g. sarge).
@@ -42,8 +42,8 @@ module_run() {
     sh "${setup_script}"
     rm -f "${setup_script}"
 
-    apt-get update
-    apt-get install -y --install-recommends webmin
+    apt-get -qq update
+    apt-get -y -o Dpkg::Progress-Fancy=1 install --install-recommends webmin
   elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
     rpm --import https://download.webmin.com/jcameron-key.asc
     cat >/etc/yum.repos.d/webmin.repo <<EOF
