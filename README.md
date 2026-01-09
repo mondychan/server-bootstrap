@@ -15,6 +15,12 @@ install and configure common services (SSH keys, Webmin, Docker, WireGuard).
 curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s --
 ```
 
+Short form:
+
+```bash
+sudo bash -c "$(curl -fsSL https://bootstrap.cocoit.cz)"
+```
+
 ## List modules
 
 ```bash
