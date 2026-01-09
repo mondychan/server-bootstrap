@@ -1,13 +1,14 @@
 # server-bootstrap
 
-Bootstrap script for fresh Ubuntu servers. It provides a simple, modular CLI to
-install and configure common services (SSH keys, Webmin, Docker, WireGuard).
+Bootstrap for fresh Ubuntu servers. Provides a modular CLI to install and
+configure core services (SSH keys, Webmin, Docker, WireGuard) with interactive
+selection by default.
 
-## What it does
+## Highlights
 
-- Runs from a local clone or directly via curl
-- Lets you select modules interactively
-- Supports running a subset of modules by ID
+- Run from a local clone or directly via curl
+- Interactive module selection (default)
+- Run specific modules by ID when you know what you want
 
 ## Quick start (interactive)
 
@@ -15,11 +16,17 @@ install and configure common services (SSH keys, Webmin, Docker, WireGuard).
 curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s --
 ```
 
-Short form:
+Short form (interactive only, no extra args):
 
 ```bash
 sudo bash -c "$(curl -fsSL https://bootstrap.cocoit.cz)"
 ```
+
+## Requirements
+
+- Ubuntu + systemd
+- `sudo` access
+- Internet access for package installs
 
 ## List modules
 
@@ -57,6 +64,15 @@ curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/mai
 - `BOOTSTRAP_VERBOSE=1` verbose output
 - `BOOTSTRAP_INTERACTIVE=0` disable interactive prompt
 
+## Module overview
+
+| Module ID | Purpose | Key env vars |
+| --- | --- | --- |
+| `ssh-keys` | Sync `authorized_keys` from GitHub via systemd timer. | `GH_USER`, `USERNAME`, `INTERVAL_MIN` |
+| `webmin` | Install Webmin and verify service is running. | `WEBMIN_PORT` |
+| `docker` | Install Docker Engine + Compose plugin and run hello-world by default. | `DOCKER_HELLO=0` |
+| `wireguard` | Interactive WireGuard client to `vpn.cocoit.cz`. | `WG_ADDRESS`, `WG_INTERFACE` |
+
 ## Module details
 
 ### ssh-keys
@@ -64,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/mai
 Sync authorized_keys from GitHub and keep them updated via systemd timer.
 
 - Default GitHub user is `mondychan`
-- Set your own with `GH_USER=yourname`
+- Override with `GH_USER=yourname`
 - Optional: `USERNAME` (default `root`), `INTERVAL_MIN` (default `15`)
 
 Example:
@@ -92,9 +108,8 @@ Optional:
 
 Interactive WireGuard client setup to `vpn.cocoit.cz`.
 
-Prompts for server IP address in the tunnel. Prints the public key so you can
-add it to the VPN concentrator. Optionally pings the gateway to test the
-connection.
+Prompts for server IP address in the tunnel, prints the public key for the VPN
+concentrator, and optionally pings the gateway to test the connection.
 
 Optional:
 - `WG_ADDRESS` to skip the prompt
@@ -110,4 +125,4 @@ sudo ./main.sh ssh-keys
 ## Notes
 
 - Run as root (`sudo`).
-- Script is designed for Ubuntu (Webmin/Docker/WireGuard modules).
+- Modules are designed for Ubuntu and systemd.
