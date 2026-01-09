@@ -106,6 +106,71 @@ list_modules() {
   done
 }
 
+prompt() {
+  local message="$1"
+  local reply=""
+  if [[ -t 0 ]]; then
+    read -r -p "$message" reply
+  elif [[ -r /dev/tty ]]; then
+    read -r -p "$message" reply < /dev/tty
+  else
+    return 1
+  fi
+  printf '%s' "$reply"
+}
+
+run_interactive() {
+  local -a paths ids descs selected_ids
+  local path choice confirm
+  local i
+
+  for path in $(discover_modules); do
+    load_module "$path"
+    paths+=("$path")
+    ids+=("${module_id}")
+    descs+=("${module_desc}")
+  done
+
+  if [[ "${#ids[@]}" -eq 0 ]]; then
+    echo "ERROR: no modules found" >&2
+    exit 1
+  fi
+
+  echo "Available modules:"
+  for i in "${!ids[@]}"; do
+    printf "  %2d) %-16s %s\n" "$((i+1))" "${ids[$i]}" "${descs[$i]}"
+  done
+
+  choice="$(prompt "Select modules (comma-separated numbers, 'all', or empty to cancel): ")"
+  if [[ -z "${choice}" ]]; then
+    echo "No modules selected."
+    exit 0
+  fi
+
+  if [[ "${choice}" == "all" ]]; then
+    selected_ids=("${ids[@]}")
+  else
+    IFS=', ' read -r -a choice_arr <<< "${choice}"
+    for i in "${choice_arr[@]}"; do
+      if [[ "$i" =~ ^[0-9]+$ ]] && (( i >= 1 && i <= ${#ids[@]} )); then
+        selected_ids+=("${ids[$((i-1))]}")
+      else
+        echo "ERROR: invalid selection: ${i}" >&2
+        exit 2
+      fi
+    done
+  fi
+
+  echo "Selected modules: ${selected_ids[*]}"
+  confirm="$(prompt "Proceed? [y/N]: ")"
+  if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
+    echo "Aborted."
+    exit 0
+  fi
+
+  run_selected "${selected_ids[@]}"
+}
+
 run_module_by_path() {
   local path="$1"
   load_module "$path"
@@ -169,8 +234,12 @@ main() {
   fi
 
   if [[ "$#" -eq 0 ]]; then
-    vlog "No module args => run all"
-    run_all
+    if [[ "${BOOTSTRAP_INTERACTIVE:-1}" == "1" ]]; then
+      run_interactive
+    else
+      vlog "No module args => run all"
+      run_all
+    fi
   else
     run_selected "$@"
   fi
