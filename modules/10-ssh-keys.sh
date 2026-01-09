@@ -135,5 +135,4 @@ EOF
   rm -f "${verify_tmp}"
 
   echo "OK: ${service_name} + ${timer_name} installed and verified (GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min})"
-  echo "Check logs: journalctl -u ${service_name} -n 50 --no-pager"
 }
