@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODULE_DIR="${BOOTSTRAP_DIR}/modules"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  sudo ./bootstrap/main.sh [module ...]
+  sudo ./bootstrap/main.sh --list
+  sudo ./bootstrap/main.sh --help
+
+Behavior:
+  - No args      => runs ALL modules in bootstrap/modules (in filename order)
+  - With args    => runs ONLY selected modules by their ID (e.g. ssh-keys)
+
+Examples:
+  # run everything
+  curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/bootstrap/main.sh | sudo bash -s --
+
+  # run only ssh-keys
+  curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/bootstrap/main.sh | sudo bash -s -- ssh-keys
+
+Env vars (global):
+  BOOTSTRAP_DRY_RUN=1        print what would run, do not execute
+  BOOTSTRAP_VERBOSE=1        verbose output
+
+Module-specific env vars are documented per module (see --list output).
+EOF
+}
+
+log() { echo "[bootstrap] $*"; }
+vlog() { [[ "${BOOTSTRAP_VERBOSE:-0}" == "1" ]] && echo "[bootstrap:verbose] $*" || true; }
+
+require_root() {
+  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+    echo "ERROR: run as root (use sudo)." >&2
+    exit 1
+  fi
+}
+
+discover_modules() {
+  # outputs absolute paths
+  shopt -s nullglob
+  local files=("${MODULE_DIR}"/*.sh)
+  printf '%s\n' "${files[@]}"
+}
+
+# Module interface:
+# Each module file, when sourced, must define:
+#   module_id, module_desc, module_run
+# Where module_run is a function: module_run() { ... }
+load_module() {
+  local path="$1"
+
+  # reset symbols
+  unset -v module_id module_desc
+  unset -f module_run 2>/dev/null || true
+
+  # shellcheck source=/dev/null
+  source "$path"
+
+  if [[ -z "${module_id:-}" || -z "${module_desc:-}" ]]; then
+    echo "ERROR: module missing module_id/module_desc: $path" >&2
+    exit 1
+  fi
+  if ! declare -F module_run >/dev/null; then
+    echo "ERROR: module missing module_run(): $path" >&2
+    exit 1
+  fi
+}
+
+list_modules() {
+  require_root || true
+  local path
+  for path in $(discover_modules); do
+    load_module "$path"
+    printf "%-16s %s\n" "${module_id}" "${module_desc}"
+  done
+}
+
+run_module_by_path() {
+  local path="$1"
+  load_module "$path"
+
+  if [[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]]; then
+    log "DRY-RUN: would run '${module_id}' - ${module_desc}"
+    return 0
+  fi
+
+  log "Running '${module_id}' - ${module_desc}"
+  module_run
+  log "Done '${module_id}'"
+}
+
+run_selected() {
+  local -a wanted_ids=("$@")
+  local found=0
+  local path
+
+  for path in $(discover_modules); do
+    load_module "$path"
+    for wid in "${wanted_ids[@]}"; do
+      if [[ "${module_id}" == "$wid" ]]; then
+        run_module_by_path "$path"
+        found=$((found+1))
+      fi
+    done
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    echo "ERROR: none of requested modules found: ${wanted_ids[*]}" >&2
+    echo "Use: sudo ./bootstrap/main.sh --list" >&2
+    exit 2
+  fi
+}
+
+run_all() {
+  local path
+  for path in $(discover_modules); do
+    run_module_by_path "$path"
+  done
+}
+
+main() {
+  case "${1:-}" in
+    --help|-h) usage; exit 0 ;;
+    --list) list_modules; exit 0 ;;
+  esac
+
+  require_root
+
+  if [[ ! -d "$MODULE_DIR" ]]; then
+    echo "ERROR: module dir not found: $MODULE_DIR" >&2
+    exit 1
+  fi
+
+  if [[ "$#" -eq 0 ]]; then
+    vlog "No module args => run all"
+    run_all
+  else
+    run_selected "$@"
+  fi
+}
+
+main "$@"
