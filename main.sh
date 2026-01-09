@@ -29,6 +29,8 @@ fi
 # --- Local file mode continues here ---
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE_DIR="${BOOTSTRAP_DIR}/modules"
+BOOTSTRAP_VERSION="2026-01-09.1"
+BOOTSTRAP_GIT_HASH="dev"
 
 usage() {
   cat <<'EOF'
@@ -124,6 +126,7 @@ run_interactive() {
   local path choice confirm
   local i
 
+  echo "[bootstrap] Version: ${BOOTSTRAP_VERSION} (${BOOTSTRAP_GIT_HASH})"
   for path in $(discover_modules); do
     load_module "$path"
     paths+=("$path")
