@@ -10,34 +10,6 @@ module_run() {
   local interval_min="${INTERVAL_MIN:-15}"
   local sshd_config="/etc/ssh/sshd_config"
 
-  detect_wg_subnet() {
-    local iface="${WG_INTERFACE:-}"
-    local conf allowed_line allowed_ips
-    if [[ -z "${iface}" ]] && command -v wg >/dev/null 2>&1; then
-      iface="$(wg show interfaces 2>/dev/null | awk '{print $1}')"
-    fi
-    if [[ -z "${iface}" ]] && [[ -d /etc/wireguard ]]; then
-      conf="$(ls /etc/wireguard/*.conf 2>/dev/null | head -n1 || true)"
-      if [[ -n "${conf}" ]]; then
-        iface="$(basename "${conf}" .conf)"
-      fi
-    fi
-    if [[ -z "${iface}" ]]; then
-      return 1
-    fi
-    conf="/etc/wireguard/${iface}.conf"
-    if [[ ! -f "${conf}" ]]; then
-      return 1
-    fi
-    allowed_line="$(grep -m1 -E '^[[:space:]]*AllowedIPs[[:space:]]*=' "${conf}" || true)"
-    if [[ -z "${allowed_line}" ]]; then
-      return 1
-    fi
-    allowed_ips="${allowed_line#*=}"
-    allowed_ips="${allowed_ips// /}"
-    printf '%s' "${allowed_ips%%,*}"
-  }
-
   if [[ -z "$gh_user" ]]; then
     echo "ERROR: GH_USER is required for module 'ssh-keys' (e.g. GH_USER=mondychan)." >&2
     exit 1
@@ -161,19 +133,6 @@ EOF
     fi
   else
     echo "WARN: ${sshd_config} not found; skipped SSH hardening" >&2
-  fi
-
-  # Ensure SSH is reachable over WireGuard when ufw is active.
-  if command -v ufw >/dev/null 2>&1; then
-    if ufw status | grep -qi "active"; then
-      local wg_subnet
-      wg_subnet="$(detect_wg_subnet || true)"
-      if [[ -n "${wg_subnet}" ]]; then
-        ufw allow from "${wg_subnet}" to any port 22 proto tcp
-      else
-        echo "WARN: could not detect WG subnet; skipped ufw SSH rule" >&2
-      fi
-    fi
   fi
 
   # Post-install verification (best-effort, fail on critical issues)

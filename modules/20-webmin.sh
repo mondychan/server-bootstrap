@@ -9,34 +9,6 @@ module_run() {
   local os_id=""
   local os_like=""
 
-  detect_wg_subnet() {
-    local iface="${WG_INTERFACE:-}"
-    local conf allowed_line allowed_ips
-    if [[ -z "${iface}" ]] && command -v wg >/dev/null 2>&1; then
-      iface="$(wg show interfaces 2>/dev/null | awk '{print $1}')"
-    fi
-    if [[ -z "${iface}" ]] && [[ -d /etc/wireguard ]]; then
-      conf="$(ls /etc/wireguard/*.conf 2>/dev/null | head -n1 || true)"
-      if [[ -n "${conf}" ]]; then
-        iface="$(basename "${conf}" .conf)"
-      fi
-    fi
-    if [[ -z "${iface}" ]]; then
-      return 1
-    fi
-    conf="/etc/wireguard/${iface}.conf"
-    if [[ ! -f "${conf}" ]]; then
-      return 1
-    fi
-    allowed_line="$(grep -m1 -E '^[[:space:]]*AllowedIPs[[:space:]]*=' "${conf}" || true)"
-    if [[ -z "${allowed_line}" ]]; then
-      return 1
-    fi
-    allowed_ips="${allowed_line#*=}"
-    allowed_ips="${allowed_ips// /}"
-    printf '%s' "${allowed_ips%%,*}"
-  }
-
   if [[ -r /etc/os-release ]]; then
     # shellcheck disable=SC1091
     . /etc/os-release
@@ -113,19 +85,6 @@ EOF
   if ! systemctl is-active --quiet webmin; then
     echo "ERROR: webmin service is not active" >&2
     exit 1
-  fi
-
-  # Ensure Webmin is reachable over WireGuard when ufw is active.
-  if command -v ufw >/dev/null 2>&1; then
-    if ufw status | grep -qi "active"; then
-      local wg_subnet
-      wg_subnet="$(detect_wg_subnet || true)"
-      if [[ -n "${wg_subnet}" ]]; then
-        ufw allow from "${wg_subnet}" to any port 10000 proto tcp
-      else
-        echo "WARN: could not detect WG subnet; skipped ufw Webmin rule" >&2
-      fi
-    fi
   fi
 
   if ! curl -ks --max-time 5 "https://127.0.0.1:${webmin_port}/" >/dev/null 2>&1; then

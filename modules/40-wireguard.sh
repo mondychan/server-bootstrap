@@ -32,16 +32,6 @@ module_run() {
     printf '%s' "$reply"
   }
 
-  add_ufw_rules() {
-    local subnet="$1"
-    if command -v ufw >/dev/null 2>&1; then
-      if ufw status | grep -qi "active"; then
-        ufw allow from "${subnet}" to any port 22 proto tcp
-        ufw allow from "${subnet}" to any port 10000 proto tcp
-      fi
-    fi
-  }
-
   if command -v apt-get >/dev/null 2>&1; then
     echo "Installing WireGuard packages"
     apt-get -qq update
@@ -111,6 +101,5 @@ EOF
       echo "WARN: cannot derive gateway from address '${wg_address}', skipping ping" >&2
     fi
   fi
-  add_ufw_rules "${allowed_ips}"
   echo "OK: WireGuard configured (${wg_iface}, ${wg_address} -> ${endpoint_host}:${endpoint_port})"
 }
