@@ -20,26 +20,30 @@ module_run() {
     apt-get update
     apt-get install -y ca-certificates curl gnupg
 
-    install -d -m 0755 /usr/share/keyrings
-    curl -fsSL https://download.webmin.com/jcameron-key.asc \
-      | gpg --dearmor -o /usr/share/keyrings/webmin.gpg
-
     echo "Removing legacy Webmin repo entries"
     # Remove legacy/unsupported Webmin repo definitions (e.g. sarge).
     rm -f /etc/apt/sources.list.d/webmin.list
     rm -f /etc/apt/sources.list.d/webmin.list.save
     rm -f /etc/apt/sources.list.d/webmin.repo
+    if [[ -d /etc/apt/sources.list.d ]]; then
+      find /etc/apt/sources.list.d -maxdepth 1 -type f -name '*.list' -print0 \
+        | xargs -0 -r grep -l 'download\.webmin\.com/download/repository' \
+        | xargs -r rm -f
+    fi
     if [[ -f /etc/apt/sources.list ]]; then
       sed -i '/download\.webmin\.com\/download\/repository/d' /etc/apt/sources.list
       sed -i '/download\.webmin\.com\/download\/newkey\/repository/d' /etc/apt/sources.list
     fi
 
-    cat >/etc/apt/sources.list.d/webmin.list <<EOF
-deb [signed-by=/usr/share/keyrings/webmin.gpg] https://download.webmin.com/download/newkey/repository stable contrib
-EOF
+    # Official Webmin repo setup script
+    local setup_script
+    setup_script="$(mktemp)"
+    curl -fsSL -o "${setup_script}" https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repo.sh
+    sh "${setup_script}"
+    rm -f "${setup_script}"
 
     apt-get update
-    apt-get install -y webmin
+    apt-get install -y --install-recommends webmin
   elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
     rpm --import https://download.webmin.com/jcameron-key.asc
     cat >/etc/yum.repos.d/webmin.repo <<EOF
