@@ -108,6 +108,7 @@ module_run() {
         enable_ufw="$(prompt "UFW is inactive. Enable now? [y/N]: ")"
         if [[ "${enable_ufw}" == "y" || "${enable_ufw}" == "Y" ]]; then
           ufw --force enable
+          ufw allow in on "${wg_iface}" from "${wg_subnet}" to any port 9090 proto tcp
         else
           echo "ERROR: ufw is inactive. Enable it or set COCOPIT_ALLOW_INACTIVE_UFW=1." >&2
           exit 1
