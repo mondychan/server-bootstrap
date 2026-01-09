@@ -5,7 +5,7 @@ module_id="docker"
 module_desc="Install Docker Engine + Compose plugin (Ubuntu via official repo)"
 
 module_run() {
-  local hello="${DOCKER_HELLO:-0}"
+  local hello="${DOCKER_HELLO:-1}"
   local os_id=""
   local codename=""
 
@@ -74,8 +74,11 @@ EOF
 
   if [[ "${hello}" == "1" ]]; then
     echo "Running hello-world test"
-    docker run --rm hello-world
+    if ! docker run --rm hello-world; then
+      echo "ERROR: hello-world test failed" >&2
+      exit 1
+    fi
   fi
 
-  echo "OK: Docker installed (docker, compose plugin)"
+  echo "OK: Docker installed and running (docker, compose plugin)"
 }
