@@ -26,7 +26,11 @@ module_run() {
   }
 
   gen_password() {
-    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "${password_len}"
+    local pw=""
+    set +o pipefail
+    pw="$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "${password_len}")"
+    set -o pipefail
+    printf '%s' "${pw}"
   }
 
   if [[ -z "${wg_iface}" ]]; then
