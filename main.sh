@@ -1,6 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- Remote/stdin mode bootstrap ---
+# When executed via: curl .../main.sh | bash -s -- ...
+# BASH_SOURCE can be unset and modules/ directory is not present.
+# We fetch the repo tarball into /tmp and re-exec from a real file path.
+if [[ "${BOOTSTRAP_EXTRACTED:-0}" != "1" ]]; then
+  # If BASH_SOURCE[0] is unavailable or empty, we are likely running from stdin.
+  if [[ -z "${BASH_SOURCE[0]:-}" ]]; then
+    REPO_TARBALL_URL="${REPO_TARBALL_URL:-https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz}"
+    TMPDIR="$(mktemp -d)"
+    trap 'rm -rf "$TMPDIR"' EXIT
+
+    curl -fsSL "$REPO_TARBALL_URL" | tar -xz -C "$TMPDIR"
+
+    # The extracted folder is typically: server-bootstrap-main
+    EXTRACTED_DIR="$(find "$TMPDIR" -maxdepth 1 -type d -name 'server-bootstrap-*' | head -n1)"
+    if [[ -z "$EXTRACTED_DIR" ]]; then
+      echo "ERROR: could not find extracted repo directory in $TMPDIR" >&2
+      exit 1
+    fi
+
+    export BOOTSTRAP_EXTRACTED=1
+    exec sudo -E bash "$EXTRACTED_DIR/main.sh" "$@"
+  fi
+fi
+
+# --- Local file mode continues here ---
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE_DIR="${BOOTSTRAP_DIR}/modules"
 
