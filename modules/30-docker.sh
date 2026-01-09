@@ -30,10 +30,8 @@ module_run() {
     | awk '{print $1}' \
     | xargs -r apt-get -y remove
 
-  echo "Adding Docker APT repository"
-  apt-get -qq update
-  apt-get -y -qq install ca-certificates curl >/dev/null
-  # Remove legacy/conflicting Docker repo entries and keys.
+  # Remove legacy/conflicting Docker repo entries and keys before any apt update.
+  echo "Cleaning legacy Docker repo entries"
   rm -f /etc/apt/sources.list.d/docker.list
   rm -f /etc/apt/sources.list.d/docker.list.save
   rm -f /etc/apt/sources.list.d/docker.sources
@@ -49,6 +47,14 @@ module_run() {
   rm -f /usr/share/keyrings/docker-archive-keyring.gpg
   rm -f /usr/share/keyrings/download.docker.com.gpg
 
+  echo "Updating package lists"
+  if ! apt-get -qq update; then
+    echo "ERROR: apt-get update failed (check /etc/apt/sources.list.d for Docker entries)" >&2
+    exit 1
+  fi
+  apt-get -y -qq install ca-certificates curl >/dev/null
+
+  echo "Adding Docker APT repository"
   install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   chmod a+r /etc/apt/keyrings/docker.asc
@@ -62,7 +68,10 @@ Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
   echo "Installing Docker packages"
-  apt-get -qq update
+  if ! apt-get -qq update; then
+    echo "ERROR: apt-get update failed after adding Docker repo" >&2
+    exit 1
+  fi
   DEBIAN_FRONTEND=noninteractive apt-get -y -qq -o Dpkg::Progress-Fancy=1 install \
     docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
