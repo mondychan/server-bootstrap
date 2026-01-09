@@ -32,14 +32,6 @@ module_run() {
     printf '%s' "$reply"
   }
 
-  if [[ -z "${wg_address}" ]]; then
-    wg_address="$(prompt "WireGuard IP address for this server (e.g. 192.168.70.10/32): ")"
-  fi
-  if [[ -z "${wg_address}" ]]; then
-    echo "ERROR: WG_ADDRESS is required (set WG_ADDRESS or run with a TTY)" >&2
-    exit 1
-  fi
-
   if command -v apt-get >/dev/null 2>&1; then
     echo "Installing WireGuard packages"
     apt-get -qq update
@@ -55,6 +47,24 @@ module_run() {
     umask 077
     wg genkey | tee "${priv_key_path}" >/dev/null
     wg pubkey < "${priv_key_path}" > "${pub_key_path}"
+  fi
+
+  echo "WireGuard public key for this server:"
+  cat "${pub_key_path}"
+
+  if [[ -z "${wg_address}" ]]; then
+    wg_address="$(prompt "WireGuard IP address for this server (e.g. 192.168.70.10/32): ")"
+  fi
+  if [[ -z "${wg_address}" ]]; then
+    echo "ERROR: WG_ADDRESS is required (set WG_ADDRESS or run with a TTY)" >&2
+    exit 1
+  fi
+
+  local confirm
+  confirm="$(prompt "Use address '${wg_address}'? [y/N]: ")"
+  if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
+    echo "Aborted."
+    exit 0
   fi
 
   cat >"${conf_path}" <<EOF
@@ -75,7 +85,21 @@ EOF
     exit 1
   fi
 
-  echo "WireGuard public key for this server:"
-  cat "${pub_key_path}"
+  local test_confirm=""
+  test_confirm="$(prompt "Test connection now (ping gateway)? [y/N]: ")"
+  if [[ "${test_confirm}" == "y" || "${test_confirm}" == "Y" ]]; then
+    local base_ip gateway_ip
+    base_ip="${wg_address%%/*}"
+    if [[ "${base_ip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      gateway_ip="${base_ip%.*}.1"
+      echo "Pinging gateway ${gateway_ip}"
+      if ! ping -c 3 -W 2 "${gateway_ip}"; then
+        echo "ERROR: ping to ${gateway_ip} failed" >&2
+        exit 1
+      fi
+    else
+      echo "WARN: cannot derive gateway from address '${wg_address}', skipping ping" >&2
+    fi
+  fi
   echo "OK: WireGuard configured (${wg_iface}, ${wg_address} -> ${endpoint_host}:${endpoint_port})"
 }
