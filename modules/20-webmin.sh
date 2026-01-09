@@ -18,7 +18,7 @@ module_run() {
 
   if command -v apt-get >/dev/null 2>&1; then
     apt-get -qq update
-    apt-get -y -o Dpkg::Progress-Fancy=1 install ca-certificates curl gnupg
+    apt-get -y -qq install ca-certificates curl gnupg >/dev/null
 
     echo "Removing legacy Webmin repo entries"
     # Remove legacy/unsupported Webmin repo definitions (e.g. sarge).
