@@ -24,8 +24,18 @@ module_run() {
     curl -fsSL https://download.webmin.com/jcameron-key.asc \
       | gpg --dearmor -o /usr/share/keyrings/webmin.gpg
 
+    echo "Removing legacy Webmin repo entries"
+    # Remove legacy/unsupported Webmin repo definitions (e.g. sarge).
+    rm -f /etc/apt/sources.list.d/webmin.list
+    rm -f /etc/apt/sources.list.d/webmin.list.save
+    rm -f /etc/apt/sources.list.d/webmin.repo
+    if [[ -f /etc/apt/sources.list ]]; then
+      sed -i '/download\.webmin\.com\/download\/repository/d' /etc/apt/sources.list
+      sed -i '/download\.webmin\.com\/download\/newkey\/repository/d' /etc/apt/sources.list
+    fi
+
     cat >/etc/apt/sources.list.d/webmin.list <<EOF
-deb [signed-by=/usr/share/keyrings/webmin.gpg] https://download.webmin.com/download/repository sarge contrib
+deb [signed-by=/usr/share/keyrings/webmin.gpg] https://download.webmin.com/download/newkey/repository stable contrib
 EOF
 
     apt-get update
