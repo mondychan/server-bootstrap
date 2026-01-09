@@ -37,6 +37,12 @@ module_run() {
   rm -f /etc/apt/sources.list.d/docker.list
   rm -f /etc/apt/sources.list.d/docker.list.save
   rm -f /etc/apt/sources.list.d/docker.sources
+  rm -f /etc/apt/sources.list.d/download.docker.com.list
+  if [[ -d /etc/apt/sources.list.d ]]; then
+    find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0 \
+      | xargs -0 -r grep -l 'download\.docker\.com/linux/ubuntu' \
+      | xargs -r rm -f
+  fi
   if [[ -f /etc/apt/sources.list ]]; then
     sed -i '/download\.docker\.com\/linux\/ubuntu/d' /etc/apt/sources.list
   fi
@@ -57,7 +63,7 @@ EOF
 
   echo "Installing Docker packages"
   apt-get -qq update
-  apt-get -y -o Dpkg::Progress-Fancy=1 install \
+  DEBIAN_FRONTEND=noninteractive apt-get -y -qq -o Dpkg::Progress-Fancy=1 install \
     docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
   systemctl enable --now docker
