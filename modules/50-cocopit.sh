@@ -101,11 +101,18 @@ module_run() {
     local ufw_status
     ufw_status="$(ufw status | head -n1 || true)"
     if echo "${ufw_status}" | grep -qi "inactive"; then
-      if [[ "${COCOPIT_ALLOW_INACTIVE_UFW:-0}" != "1" ]]; then
-        echo "ERROR: ufw is inactive. Enable it or set COCOPIT_ALLOW_INACTIVE_UFW=1." >&2
-        exit 1
+      if [[ "${COCOPIT_ALLOW_INACTIVE_UFW:-0}" == "1" ]]; then
+        echo "WARN: ufw inactive, skipping firewall rule"
+      else
+        local enable_ufw
+        enable_ufw="$(prompt "UFW is inactive. Enable now? [y/N]: ")"
+        if [[ "${enable_ufw}" == "y" || "${enable_ufw}" == "Y" ]]; then
+          ufw --force enable
+        else
+          echo "ERROR: ufw is inactive. Enable it or set COCOPIT_ALLOW_INACTIVE_UFW=1." >&2
+          exit 1
+        fi
       fi
-      echo "WARN: ufw inactive, skipping firewall rule"
     else
       if ufw status | grep -qiE '^9090/tcp[[:space:]].*ALLOW IN[[:space:]].*Anywhere'; then
         echo "WARN: existing broad rule allows 9090 from anywhere"
