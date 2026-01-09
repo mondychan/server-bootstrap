@@ -29,30 +29,37 @@ fi
 # --- Local file mode continues here ---
 BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODULE_DIR="${BOOTSTRAP_DIR}/modules"
-BOOTSTRAP_VERSION="2026-01-09.2"
+BOOTSTRAP_VERSION="2026-01-09.3"
 BOOTSTRAP_GIT_HASH="dev"
 
 usage() {
   cat <<'EOF'
 Usage:
-  sudo ./bootstrap/main.sh [module ...]
-  sudo ./bootstrap/main.sh --list
-  sudo ./bootstrap/main.sh --help
+  sudo ./main.sh [module ...]
+  sudo ./main.sh --list
+  sudo ./main.sh --help
 
 Behavior:
-  - No args      => runs ALL modules in bootstrap/modules (in filename order)
+  - No args      => interactive module selection (default)
   - With args    => runs ONLY selected modules by their ID (e.g. ssh-keys)
+  - BOOTSTRAP_INTERACTIVE=0 => run ALL modules (in filename order)
 
 Examples:
-  # run everything
-  curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/bootstrap/main.sh | sudo bash -s --
+  # interactive selection
+  curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s --
+
+  # run everything (no prompt)
+  curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo BOOTSTRAP_INTERACTIVE=0 bash -s --
 
   # run only ssh-keys
-  curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/bootstrap/main.sh | sudo bash -s -- ssh-keys
+  curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s -- ssh-keys
+
+  # interactive: select all (type "all" or "A")
 
 Env vars (global):
   BOOTSTRAP_DRY_RUN=1        print what would run, do not execute
   BOOTSTRAP_VERBOSE=1        verbose output
+  BOOTSTRAP_INTERACTIVE=0    disable interactive prompt
 
 Module-specific env vars are documented per module (see --list output).
 EOF
@@ -211,7 +218,7 @@ run_selected() {
 
   if [[ "$found" -eq 0 ]]; then
     echo "ERROR: none of requested modules found: ${wanted_ids[*]}" >&2
-    echo "Use: sudo ./bootstrap/main.sh --list" >&2
+    echo "Use: sudo ./main.sh --list" >&2
     exit 2
   fi
 }
