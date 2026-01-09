@@ -17,6 +17,7 @@ module_run() {
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
+    echo "Updating package lists"
     apt-get -qq update
     apt-get -y -qq install ca-certificates curl gnupg >/dev/null
 
@@ -42,6 +43,7 @@ module_run() {
     sh "${setup_script}"
     rm -f "${setup_script}"
 
+    echo "Installing Webmin"
     apt-get -qq update
     apt-get -y -o Dpkg::Progress-Fancy=1 install --install-recommends webmin
   elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
