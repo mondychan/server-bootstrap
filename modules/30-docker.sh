@@ -39,7 +39,7 @@ module_run() {
   if [[ -d /etc/apt/sources.list.d ]]; then
     find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0 \
       | xargs -0 -r grep -l 'download\.docker\.com/linux/ubuntu' \
-      | xargs -r rm -f
+      | xargs -r rm -f || true
   fi
   if [[ -f /etc/apt/sources.list ]]; then
     sed -i '/download\.docker\.com\/linux\/ubuntu/d' /etc/apt/sources.list
