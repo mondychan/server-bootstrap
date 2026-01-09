@@ -8,6 +8,7 @@ module_run() {
   local gh_user="${GH_USER:-}"
   local target_user="${USERNAME:-root}"
   local interval_min="${INTERVAL_MIN:-15}"
+  local sshd_config="/etc/ssh/sshd_config"
 
   if [[ -z "$gh_user" ]]; then
     echo "ERROR: GH_USER is required for module 'ssh-keys' (e.g. GH_USER=mondychan)." >&2
@@ -94,6 +95,45 @@ EOF
   systemctl daemon-reload
   systemctl enable --now "${timer_name}"
   systemctl start "${service_name}"
+
+  # Enforce key-only SSH for root by default.
+  if [[ -f "${sshd_config}" ]]; then
+    if grep -qE '^[[:space:]]*#?[[:space:]]*PermitRootLogin[[:space:]]' "${sshd_config}"; then
+      sed -i 's/^[[:space:]]*#\?[[:space:]]*PermitRootLogin[[:space:]].*/PermitRootLogin prohibit-password/' "${sshd_config}"
+    else
+      echo "PermitRootLogin prohibit-password" >> "${sshd_config}"
+    fi
+    if grep -qE '^[[:space:]]*#?[[:space:]]*PubkeyAuthentication[[:space:]]' "${sshd_config}"; then
+      sed -i 's/^[[:space:]]*#\?[[:space:]]*PubkeyAuthentication[[:space:]].*/PubkeyAuthentication yes/' "${sshd_config}"
+    else
+      echo "PubkeyAuthentication yes" >> "${sshd_config}"
+    fi
+    if grep -qE '^[[:space:]]*#?[[:space:]]*PasswordAuthentication[[:space:]]' "${sshd_config}"; then
+      sed -i 's/^[[:space:]]*#\?[[:space:]]*PasswordAuthentication[[:space:]].*/PasswordAuthentication no/' "${sshd_config}"
+    else
+      echo "PasswordAuthentication no" >> "${sshd_config}"
+    fi
+    if grep -qE '^[[:space:]]*#?[[:space:]]*ChallengeResponseAuthentication[[:space:]]' "${sshd_config}"; then
+      sed -i 's/^[[:space:]]*#\?[[:space:]]*ChallengeResponseAuthentication[[:space:]].*/ChallengeResponseAuthentication no/' "${sshd_config}"
+    else
+      echo "ChallengeResponseAuthentication no" >> "${sshd_config}"
+    fi
+    if grep -qE '^[[:space:]]*#?[[:space:]]*KbdInteractiveAuthentication[[:space:]]' "${sshd_config}"; then
+      sed -i 's/^[[:space:]]*#\?[[:space:]]*KbdInteractiveAuthentication[[:space:]].*/KbdInteractiveAuthentication no/' "${sshd_config}"
+    else
+      echo "KbdInteractiveAuthentication no" >> "${sshd_config}"
+    fi
+
+    if systemctl list-unit-files --type=service | grep -q '^sshd\.service'; then
+      systemctl reload sshd || systemctl restart sshd
+    elif systemctl list-unit-files --type=service | grep -q '^ssh\.service'; then
+      systemctl reload ssh || systemctl restart ssh
+    else
+      echo "WARN: ssh service unit not found; skipped reload" >&2
+    fi
+  else
+    echo "WARN: ${sshd_config} not found; skipped SSH hardening" >&2
+  fi
 
   # Post-install verification (best-effort, fail on critical issues)
   if [[ ! -x "${script_path}" ]]; then
