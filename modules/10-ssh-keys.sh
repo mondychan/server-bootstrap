@@ -95,6 +95,45 @@ EOF
   systemctl enable --now "${timer_name}"
   systemctl start "${service_name}"
 
-  echo "OK: ${service_name} + ${timer_name} installed (GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min})"
-  echo "Check: journalctl -u ${service_name} -n 50 --no-pager"
+  # Post-install verification (best-effort, fail on critical issues)
+  if [[ ! -x "${script_path}" ]]; then
+    echo "ERROR: expected script missing or not executable: ${script_path}" >&2
+    exit 1
+  fi
+
+  if ! systemctl is-enabled --quiet "${timer_name}"; then
+    echo "ERROR: timer not enabled: ${timer_name}" >&2
+    exit 1
+  fi
+  if ! systemctl is-active --quiet "${timer_name}"; then
+    echo "ERROR: timer not active: ${timer_name}" >&2
+    exit 1
+  fi
+
+  # Run once and verify authorized_keys got content
+  if ! systemctl start "${service_name}"; then
+    echo "ERROR: failed to start service: ${service_name}" >&2
+    exit 1
+  fi
+  if [[ ! -s "${auth_keys}" ]]; then
+    echo "ERROR: ${auth_keys} is empty after sync" >&2
+    exit 1
+  fi
+  # Verify content matches GitHub keys payload.
+  local verify_tmp
+  verify_tmp="$(mktemp)"
+  if ! curl -fsSL "https://github.com/${gh_user}.keys" > "${verify_tmp}"; then
+    echo "ERROR: failed to fetch https://github.com/${gh_user}.keys for verification" >&2
+    rm -f "${verify_tmp}"
+    exit 1
+  fi
+  if ! diff -q "${verify_tmp}" "${auth_keys}" >/dev/null 2>&1; then
+    echo "ERROR: ${auth_keys} does not match GitHub keys payload" >&2
+    rm -f "${verify_tmp}"
+    exit 1
+  fi
+  rm -f "${verify_tmp}"
+
+  echo "OK: ${service_name} + ${timer_name} installed and verified (GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min})"
+  echo "Check logs: journalctl -u ${service_name} -n 50 --no-pager"
 }
