@@ -21,9 +21,11 @@ module_run() {
     local message="$1"
     local reply=""
     if [[ -t 0 ]]; then
-      read -r -p "$message" reply
+      printf "%s" "$message" > /dev/tty
+      read -r reply
     elif [[ -r /dev/tty ]]; then
-      read -r -p "$message" reply < /dev/tty
+      printf "%s" "$message" > /dev/tty
+      read -r reply < /dev/tty
     else
       return 1
     fi
@@ -34,7 +36,7 @@ module_run() {
     wg_address="$(prompt "WireGuard IP address for this server (e.g. 192.168.70.10/32): ")"
   fi
   if [[ -z "${wg_address}" ]]; then
-    echo "ERROR: WG_ADDRESS is required" >&2
+    echo "ERROR: WG_ADDRESS is required (set WG_ADDRESS or run with a TTY)" >&2
     exit 1
   fi
 
