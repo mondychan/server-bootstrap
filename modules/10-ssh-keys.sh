@@ -5,7 +5,7 @@ module_id="ssh-keys"
 module_desc="Sync authorized_keys from GitHub via systemd timer (root by default)"
 
 module_run() {
-  local gh_user="${GH_USER:-}"
+  local gh_user="${GH_USER:-mondychan}"
   local target_user="${USERNAME:-root}"
   local interval_min="${INTERVAL_MIN:-15}"
   local sshd_config="/etc/ssh/sshd_config"
