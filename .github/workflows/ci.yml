@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck bats
+          curl -fsSL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o shfmt
+          chmod +x shfmt
+          sudo mv shfmt /usr/local/bin/shfmt
+
+      - name: shfmt
+        run: |
+          shfmt -d main.sh lib/common.sh modules/*.sh gui/start.sh
+
+      - name: shellcheck
+        run: |
+          shellcheck main.sh lib/common.sh modules/*.sh gui/start.sh
+
+      - name: bats
+        run: |
+          bats tests

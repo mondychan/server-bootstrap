@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Server Bootstrap Control</title>
+  <style>
+    :root {
+      --bg: #f3f6ef;
+      --panel: #ffffff;
+      --ink: #13231a;
+      --muted: #4f6459;
+      --accent: #1e7d4b;
+      --accent-2: #cbe9d8;
+      --danger: #b02121;
+      --border: #d7e5db;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 10%, #e9f5ea 0%, transparent 40%),
+        linear-gradient(170deg, #f8fbf5 0%, #edf4ec 100%);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .layout {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(25, 44, 34, 0.06);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.3rem;
+      letter-spacing: .02em;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.93rem;
+      color: var(--muted);
+    }
+
+    select, button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .12s ease, opacity .12s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: .6; cursor: default; transform: none; }
+
+    .danger {
+      background: var(--danger);
+    }
+
+    .modules {
+      max-height: 330px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px;
+      background: #f9fcf8;
+    }
+
+    .mod-item {
+      display: block;
+      padding: 8px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      border: 1px solid transparent;
+      background: #fff;
+    }
+
+    .mod-item:hover {
+      border-color: var(--accent-2);
+    }
+
+    .mod-id {
+      font-weight: 700;
+      font-size: .9rem;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .mod-desc {
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    .stack { display: grid; gap: 10px; }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .status {
+      font-size: .9rem;
+      color: var(--muted);
+      min-height: 20px;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0c1711;
+      color: #d4ffe5;
+      border-radius: 12px;
+      border: 1px solid #173626;
+      padding: 12px;
+      min-height: 420px;
+      max-height: 70vh;
+      overflow: auto;
+      font-family: Consolas, "Cascadia Mono", monospace;
+      font-size: .85rem;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <section class="panel stack">
+      <h1>Server Bootstrap Control</h1>
+
+      <div>
+        <h2>Profile</h2>
+        <label>
+          Config profile
+          <select id="profileSelect">
+            <option value="">default (none)</option>
+          </select>
+        </label>
+      </div>
+
+      <div>
+        <h2>Action</h2>
+        <label>
+          Lifecycle stage
+          <select id="actionSelect">
+            <option value="plan">plan</option>
+            <option value="apply">apply</option>
+            <option value="verify">verify</option>
+          </select>
+        </label>
+      </div>
+
+      <div>
+        <h2>Modules</h2>
+        <div id="modulesBox" class="modules"></div>
+      </div>
+
+      <div class="toolbar">
+        <button id="allBtn" type="button">Select all</button>
+        <button id="noneBtn" type="button" class="danger">Clear</button>
+      </div>
+
+      <button id="runBtn" type="button">Run</button>
+      <div class="status" id="statusLine"></div>
+    </section>
+
+    <section class="panel stack">
+      <h2>Execution Output</h2>
+      <pre id="output"></pre>
+    </section>
+  </div>
+
+  <script>
+    const modulesBox = document.getElementById("modulesBox");
+    const profileSelect = document.getElementById("profileSelect");
+    const actionSelect = document.getElementById("actionSelect");
+    const runBtn = document.getElementById("runBtn");
+    const statusLine = document.getElementById("statusLine");
+    const output = document.getElementById("output");
+    const allBtn = document.getElementById("allBtn");
+    const noneBtn = document.getElementById("noneBtn");
+
+    let modules = [];
+
+    function setStatus(text) {
+      statusLine.textContent = text;
+    }
+
+    function selectedModules() {
+      return [...modulesBox.querySelectorAll("input[type=checkbox]:checked")].map((el) => el.value);
+    }
+
+    function renderModules() {
+      modulesBox.innerHTML = "";
+      modules.forEach((mod) => {
+        const label = document.createElement("label");
+        label.className = "mod-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = mod.id;
+
+        const id = document.createElement("span");
+        id.className = "mod-id";
+        id.textContent = mod.id;
+
+        const desc = document.createElement("span");
+        desc.className = "mod-desc";
+        desc.textContent = mod.desc;
+
+        label.appendChild(checkbox);
+        label.appendChild(id);
+        label.appendChild(desc);
+
+        modulesBox.appendChild(label);
+      });
+    }
+
+    async function loadModules() {
+      const res = await fetch("/api/modules");
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.error || "Cannot load modules");
+      }
+      modules = data.modules;
+      renderModules();
+    }
+
+    async function loadProfiles() {
+      const res = await fetch("/api/profiles");
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.error || "Cannot load profiles");
+      }
+      data.profiles.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = p;
+        opt.textContent = p;
+        profileSelect.appendChild(opt);
+      });
+    }
+
+    async function run() {
+      const selected = selectedModules();
+      if (selected.length === 0) {
+        setStatus("Select at least one module.");
+        return;
+      }
+
+      runBtn.disabled = true;
+      setStatus("Running...");
+      output.textContent = "";
+
+      const payload = {
+        action: actionSelect.value,
+        profile: profileSelect.value,
+        modules: selected
+      };
+
+      try {
+        const res = await fetch("/api/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        output.textContent = [
+          `$ ${data.command}`,
+          "",
+          data.output || ""
+        ].join("\n");
+
+        setStatus(data.ok ? "Done." : `Failed (exit ${data.exit_code}).`);
+      } catch (err) {
+        setStatus(`Request failed: ${err.message}`);
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    allBtn.addEventListener("click", () => {
+      modulesBox.querySelectorAll("input[type=checkbox]").forEach((el) => {
+        el.checked = true;
+      });
+    });
+
+    noneBtn.addEventListener("click", () => {
+      modulesBox.querySelectorAll("input[type=checkbox]").forEach((el) => {
+        el.checked = false;
+      });
+    });
+
+    runBtn.addEventListener("click", run);
+
+    (async () => {
+      try {
+        await Promise.all([loadModules(), loadProfiles()]);
+        setStatus("Ready.");
+      } catch (err) {
+        setStatus(err.message);
+      }
+    })();
+  </script>
+</body>
+</html>

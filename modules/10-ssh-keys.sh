@@ -3,30 +3,99 @@ set -euo pipefail
 
 module_id="ssh-keys"
 module_desc="Sync authorized_keys from GitHub via systemd timer (root by default)"
+module_env="GH_USER, USERNAME, INTERVAL_MIN"
+module_deps=()
 
-module_run() {
+resolve_home_dir() {
+  local target_user="$1"
+
+  if [[ "$target_user" == "root" ]]; then
+    printf '/root'
+    return 0
+  fi
+
+  local home_dir
+  home_dir="$(getent passwd "$target_user" | cut -d: -f6 || true)"
+  if [[ -z "$home_dir" || ! -d "$home_dir" ]]; then
+    echo "ERROR: cannot resolve home for USERNAME=$target_user" >&2
+    return 1
+  fi
+
+  printf '%s' "$home_dir"
+}
+
+harden_sshd_config() {
+  local sshd_config="$1"
+
+  if [[ ! -f "$sshd_config" ]]; then
+    echo "WARN: ${sshd_config} not found; skipped SSH hardening" >&2
+    return 0
+  fi
+
+  local backup
+  backup="${sshd_config}.bootstrap.$(date +%Y%m%d%H%M%S).bak"
+  cp -a "$sshd_config" "$backup"
+
+  set_config_option "$sshd_config" "PermitRootLogin" "prohibit-password"
+  set_config_option "$sshd_config" "PubkeyAuthentication" "yes"
+  set_config_option "$sshd_config" "PasswordAuthentication" "no"
+  set_config_option "$sshd_config" "ChallengeResponseAuthentication" "no"
+  set_config_option "$sshd_config" "KbdInteractiveAuthentication" "no"
+
+  if command -v sshd >/dev/null 2>&1; then
+    if ! sshd -t -f "$sshd_config"; then
+      cp -a "$backup" "$sshd_config"
+      echo "ERROR: sshd config validation failed, restored backup: $backup" >&2
+      return 1
+    fi
+  fi
+
+  if systemctl list-unit-files --type=service | grep -q '^sshd\.service'; then
+    systemctl reload sshd || systemctl restart sshd
+  elif systemctl list-unit-files --type=service | grep -q '^ssh\.service'; then
+    systemctl reload ssh || systemctl restart ssh
+  else
+    echo "WARN: ssh service unit not found; skipped reload" >&2
+  fi
+
+  echo "OK: sshd hardened (backup: ${backup})"
+}
+
+module_plan() {
+  local gh_user="${GH_USER:-mondychan}"
+  local target_user="${USERNAME:-root}"
+  local interval_min="${INTERVAL_MIN:-15}"
+
+  echo "Plan: create sync script + systemd timer for GitHub SSH keys"
+  echo "Plan: GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min}"
+  echo "Plan: enforce SSH key-only login in /etc/ssh/sshd_config with rollback-safe validation"
+}
+
+module_apply() {
   local gh_user="${GH_USER:-mondychan}"
   local target_user="${USERNAME:-root}"
   local interval_min="${INTERVAL_MIN:-15}"
   local sshd_config="/etc/ssh/sshd_config"
 
-  if [[ -z "$gh_user" ]]; then
-    echo "ERROR: GH_USER is required for module 'ssh-keys' (e.g. GH_USER=mondychan)." >&2
+  if [[ -z "$gh_user" || ! "$gh_user" =~ ^[a-zA-Z0-9-]{1,39}$ ]]; then
+    echo "ERROR: invalid GH_USER='$gh_user' (expected GitHub username)" >&2
+    exit 1
+  fi
+  if ! validate_username "$target_user"; then
+    echo "ERROR: invalid USERNAME='$target_user'" >&2
+    exit 1
+  fi
+  if ! validate_positive_int "$interval_min"; then
+    echo "ERROR: invalid INTERVAL_MIN='$interval_min' (expected positive integer)" >&2
     exit 1
   fi
 
-  local home_dir ssh_dir auth_keys script_path service_name timer_name
+  require_cmd curl systemctl install getent diff
 
-  if [[ "$target_user" == "root" ]]; then
-    home_dir="/root"
-  else
-    home_dir="$(getent passwd "$target_user" | cut -d: -f6 || true)"
-    if [[ -z "$home_dir" || ! -d "$home_dir" ]]; then
-      echo "ERROR: cannot resolve home for USERNAME=$target_user" >&2
-      exit 1
-    fi
-  fi
+  local home_dir
+  home_dir="$(resolve_home_dir "$target_user")"
 
+  local ssh_dir auth_keys script_path service_name timer_name
   ssh_dir="${home_dir}/.ssh"
   auth_keys="${ssh_dir}/authorized_keys"
 
@@ -36,7 +105,7 @@ module_run() {
   service_name="sync-${target_user}-keys.service"
   timer_name="sync-${target_user}-keys.timer"
 
-  cat >"$script_path" <<EOF
+  cat <<EOF | safe_write_file "$script_path" 0755 root root
 #!/bin/sh
 set -eu
 GH_USER="${gh_user}"
@@ -66,9 +135,7 @@ rm -f "\$TMP"
 echo "sync-${target_user}-keys: updated ${auth_keys} OK"
 EOF
 
-  chmod +x "$script_path"
-
-  cat >"/etc/systemd/system/${service_name}" <<EOF
+  cat <<EOF | safe_write_file "/etc/systemd/system/${service_name}" 0644 root root
 [Unit]
 Description=Sync ${target_user} authorized_keys from GitHub
 
@@ -79,7 +146,7 @@ StandardOutput=journal
 StandardError=journal
 EOF
 
-  cat >"/etc/systemd/system/${timer_name}" <<EOF
+  cat <<EOF | safe_write_file "/etc/systemd/system/${timer_name}" 0644 root root
 [Unit]
 Description=Periodic sync of ${target_user} authorized_keys from GitHub
 
@@ -96,51 +163,28 @@ EOF
   systemctl enable --now "${timer_name}"
   systemctl start "${service_name}"
 
-  # Enforce key-only SSH for root by default.
-  if [[ -f "${sshd_config}" ]]; then
-    if grep -qE '^[[:space:]]*#?[[:space:]]*PermitRootLogin[[:space:]]' "${sshd_config}"; then
-      sed -i 's/^[[:space:]]*#\?[[:space:]]*PermitRootLogin[[:space:]].*/PermitRootLogin prohibit-password/' "${sshd_config}"
-    else
-      echo "PermitRootLogin prohibit-password" >> "${sshd_config}"
-    fi
-    if grep -qE '^[[:space:]]*#?[[:space:]]*PubkeyAuthentication[[:space:]]' "${sshd_config}"; then
-      sed -i 's/^[[:space:]]*#\?[[:space:]]*PubkeyAuthentication[[:space:]].*/PubkeyAuthentication yes/' "${sshd_config}"
-    else
-      echo "PubkeyAuthentication yes" >> "${sshd_config}"
-    fi
-    if grep -qE '^[[:space:]]*#?[[:space:]]*PasswordAuthentication[[:space:]]' "${sshd_config}"; then
-      sed -i 's/^[[:space:]]*#\?[[:space:]]*PasswordAuthentication[[:space:]].*/PasswordAuthentication no/' "${sshd_config}"
-    else
-      echo "PasswordAuthentication no" >> "${sshd_config}"
-    fi
-    if grep -qE '^[[:space:]]*#?[[:space:]]*ChallengeResponseAuthentication[[:space:]]' "${sshd_config}"; then
-      sed -i 's/^[[:space:]]*#\?[[:space:]]*ChallengeResponseAuthentication[[:space:]].*/ChallengeResponseAuthentication no/' "${sshd_config}"
-    else
-      echo "ChallengeResponseAuthentication no" >> "${sshd_config}"
-    fi
-    if grep -qE '^[[:space:]]*#?[[:space:]]*KbdInteractiveAuthentication[[:space:]]' "${sshd_config}"; then
-      sed -i 's/^[[:space:]]*#\?[[:space:]]*KbdInteractiveAuthentication[[:space:]].*/KbdInteractiveAuthentication no/' "${sshd_config}"
-    else
-      echo "KbdInteractiveAuthentication no" >> "${sshd_config}"
-    fi
+  harden_sshd_config "$sshd_config"
 
-    if systemctl list-unit-files --type=service | grep -q '^sshd\.service'; then
-      systemctl reload sshd || systemctl restart sshd
-    elif systemctl list-unit-files --type=service | grep -q '^ssh\.service'; then
-      systemctl reload ssh || systemctl restart ssh
-    else
-      echo "WARN: ssh service unit not found; skipped reload" >&2
-    fi
-  else
-    echo "WARN: ${sshd_config} not found; skipped SSH hardening" >&2
-  fi
+  echo "OK: ${service_name} + ${timer_name} installed (GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min})"
+}
 
-  # Post-install verification (best-effort, fail on critical issues)
+module_verify() {
+  local gh_user="${GH_USER:-mondychan}"
+  local target_user="${USERNAME:-root}"
+
+  local home_dir script_path service_name timer_name ssh_dir auth_keys
+  home_dir="$(resolve_home_dir "$target_user")"
+  ssh_dir="${home_dir}/.ssh"
+  auth_keys="${ssh_dir}/authorized_keys"
+
+  script_path="/usr/local/sbin/sync-${target_user}-authorized-keys.sh"
+  service_name="sync-${target_user}-keys.service"
+  timer_name="sync-${target_user}-keys.timer"
+
   if [[ ! -x "${script_path}" ]]; then
     echo "ERROR: expected script missing or not executable: ${script_path}" >&2
     exit 1
   fi
-
   if ! systemctl is-enabled --quiet "${timer_name}"; then
     echo "ERROR: timer not enabled: ${timer_name}" >&2
     exit 1
@@ -150,16 +194,16 @@ EOF
     exit 1
   fi
 
-  # Run once and verify authorized_keys got content
   if ! systemctl start "${service_name}"; then
     echo "ERROR: failed to start service: ${service_name}" >&2
     exit 1
   fi
+
   if [[ ! -s "${auth_keys}" ]]; then
     echo "ERROR: ${auth_keys} is empty after sync" >&2
     exit 1
   fi
-  # Verify content matches GitHub keys payload.
+
   local verify_tmp
   verify_tmp="$(mktemp)"
   if ! curl -fsSL "https://github.com/${gh_user}.keys" > "${verify_tmp}"; then
@@ -174,5 +218,5 @@ EOF
   fi
   rm -f "${verify_tmp}"
 
-  echo "OK: ${service_name} + ${timer_name} installed and verified (GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min})"
+  echo "OK: ${service_name} + ${timer_name} verified"
 }
