@@ -116,8 +116,9 @@ Options:
   --verify               run verify stage only
   --modules <csv>        comma-separated module IDs
   --profile <name>       load profiles/<name>.env
-  --tui                  force TUI selector (gum/whiptail)
-  --tui-gum              force gum wizard (modern TUI)
+  --tui                  force TUI selector (portable/whiptail)
+  --tui-portable         force portable Bash wizard (no extra dependencies)
+  --tui-gum              compatibility alias for --tui-portable
   --tui-whiptail         force whiptail wizard (max compatibility)
   --no-interactive       disable prompts and interactive selection
   --list                 list modules in text format
@@ -130,8 +131,8 @@ Env vars (global):
   BOOTSTRAP_DRY_RUN=1        skip apply stage, keep planning
   BOOTSTRAP_VERBOSE=1        verbose logs
   BOOTSTRAP_INTERACTIVE=0    disable interactive selection
-  BOOTSTRAP_TUI=auto|gum|whiptail|1|0
-                             auto prefers whiptail; gum/whiptail force concrete UI
+  BOOTSTRAP_TUI=auto|portable|whiptail|1|0
+                             auto prefers whiptail; portable/whiptail force concrete UI
   BOOTSTRAP_LOG_DIR=<path>   override log directory
   BOOTSTRAP_STATE_DIR=<path> override state directory
   BOOTSTRAP_LOCK_FILE=<path> override lock file
@@ -390,8 +391,12 @@ parse_args() {
       USE_TUI=1
       shift
       ;;
+    --tui-portable)
+      USE_TUI="portable"
+      shift
+      ;;
     --tui-gum)
-      USE_TUI="gum"
+      USE_TUI="portable"
       shift
       ;;
     --tui-whiptail)
@@ -422,21 +427,19 @@ parse_args() {
 }
 
 normalize_tui_setting() {
-  gum_usable() {
-    command -v gum >/dev/null 2>&1 || return 1
+  portable_usable() {
+    [[ -t 0 ]] || return 1
     [[ -t 1 ]] || return 1
     [[ -n "${TERM:-}" && "${TERM}" != "dumb" ]] || return 1
     return 0
   }
 
   case "${USE_TUI,,}" in
-  gum | modern)
-    if gum_usable; then
-      USE_TUI="gum"
-    elif command -v gum >/dev/null 2>&1; then
-      USE_TUI="gum"
+  portable | modern | gum)
+    if portable_usable; then
+      USE_TUI="portable"
     else
-      echo "ERROR: BOOTSTRAP_TUI=gum requested but gum is not installed." >&2
+      echo "ERROR: BOOTSTRAP_TUI=portable requested but terminal is not interactive." >&2
       exit 2
     fi
     ;;
@@ -451,8 +454,8 @@ normalize_tui_setting() {
   1 | true | yes | on)
     if command -v whiptail >/dev/null 2>&1; then
       USE_TUI="whiptail"
-    elif gum_usable; then
-      USE_TUI="gum"
+    elif portable_usable; then
+      USE_TUI="portable"
     else
       USE_TUI="0"
     fi
@@ -463,8 +466,8 @@ normalize_tui_setting() {
   auto | "")
     if command -v whiptail >/dev/null 2>&1; then
       USE_TUI="whiptail"
-    elif gum_usable; then
-      USE_TUI="gum"
+    elif portable_usable; then
+      USE_TUI="portable"
     else
       USE_TUI="0"
     fi
@@ -712,6 +715,113 @@ EOF
   WIZARD_INTRO_SHOWN=1
 }
 
+portable_clear_screen() {
+  printf '\033[2J\033[H' >/dev/tty
+}
+
+portable_wait_for_any_key() {
+  local _
+  IFS= read -rsn1 _ </dev/tty || true
+}
+
+portable_read_key() {
+  local key rest
+  IFS= read -rsn1 key </dev/tty || return 1
+  if [[ "$key" == $'\x1b' ]]; then
+    IFS= read -rsn2 -t 0.05 rest </dev/tty || true
+    key+="$rest"
+  fi
+  printf '%s' "$key"
+}
+
+show_portable_intro_once() {
+  [[ "$USE_TUI" == "portable" ]] || return 0
+  [[ "${WIZARD_INTRO_SHOWN:-0}" == "1" ]] && return 0
+
+  portable_clear_screen
+  cat >/dev/tty <<EOF
+Server Bootstrap Wizard
+Version: ${BOOTSTRAP_VERSION} (${BOOTSTRAP_GIT_HASH})
+Action: ${ACTION}
+Run: ${RUN_ID}
+
+Automated provisioning wizard for fresh servers.
+
+Navigation:
+  Up/Down (or j/k): move
+  Space: toggle selection (modules)
+  Enter: confirm
+  q or Esc: cancel
+
+Press any key to continue...
+EOF
+  portable_wait_for_any_key
+  WIZARD_INTRO_SHOWN=1
+}
+
+draw_profile_portable() {
+  local -n options_ref=$1
+  local current_index="$2"
+  local i name marker
+
+  portable_clear_screen
+  cat >/dev/tty <<EOF
+Server Bootstrap Wizard | Version ${BOOTSTRAP_VERSION} | Action ${ACTION}
+Profile selection (portable mode)
+
+Choose profile (none/dev/prod/custom from profiles/*.env):
+
+EOF
+
+  for i in "${!options_ref[@]}"; do
+    name="${options_ref[$i]}"
+    marker="  "
+    if ((i == current_index)); then
+      marker="> "
+    fi
+    printf '%s%s\n' "$marker" "$name" >/dev/tty
+  done
+
+  cat >/dev/tty <<'EOF'
+
+Keys: Up/Down (or j/k), Enter confirm, q/Esc cancel
+EOF
+}
+
+choose_profile_portable() {
+  local -a profiles=("$@")
+  local -a options=("none")
+  local idx=0 key selected_name
+
+  options+=("${profiles[@]}")
+  show_portable_intro_once
+
+  while true; do
+    draw_profile_portable options "$idx"
+    key="$(portable_read_key || true)"
+    case "$key" in
+    $'\x1b[A' | k)
+      ((idx > 0)) && idx=$((idx - 1))
+      ;;
+    $'\x1b[B' | j)
+      ((idx < ${#options[@]} - 1)) && idx=$((idx + 1))
+      ;;
+    "" | $'\n' | $'\r')
+      selected_name="${options[$idx]}"
+      if [[ "$selected_name" != "none" ]]; then
+        PROFILE_NAME="$selected_name"
+      fi
+      portable_clear_screen
+      return 0
+      ;;
+    q | Q | $'\x1b')
+      portable_clear_screen
+      return 1
+      ;;
+    esac
+  done
+}
+
 choose_profile_interactive() {
   [[ -n "$PROFILE_NAME" ]] && return 0
 
@@ -719,21 +829,10 @@ choose_profile_interactive() {
   discover_profiles profiles
   [[ "${#profiles[@]}" -eq 0 ]] && return 0
 
-  if [[ "$USE_TUI" == "gum" ]] && command -v gum >/dev/null 2>&1; then
-    local profile_lines=()
-    local p picked selected_name
-    profile_lines+=("none :: No profile (module defaults)")
-    for p in "${profiles[@]}"; do
-      profile_lines+=("${p} :: Load profiles/${p}.env")
-    done
-
-    picked="$(gum choose --header "Select profile" "${profile_lines[@]}")" || {
+  if [[ "$USE_TUI" == "portable" ]]; then
+    if ! choose_profile_portable "${profiles[@]}"; then
       echo "Aborted."
       exit 0
-    }
-    selected_name="${picked%% :: *}"
-    if [[ "$selected_name" != "none" ]]; then
-      PROFILE_NAME="$selected_name"
     fi
     return 0
   fi
@@ -804,87 +903,108 @@ Source: ${path}
 EOF
 }
 
-browse_modules_gum() {
-  local lines=()
-  local id
-  for id in "${MODULE_IDS[@]}"; do
-    lines+=("${id} :: ${MODULE_DESC_BY_ID[$id]}")
-  done
+draw_modules_portable() {
+  local -n ids_ref=$1
+  local -n marks_ref=$2
+  local current_index="$3"
+  local status_line="$4"
+  local i id mark prefix
 
-  while true; do
-    local picked
-    picked="$(gum choose --header "Browse modules" "${lines[@]}" "back :: Return to selection")" || return 0
-    local selected_id="${picked%% :: *}"
-    if [[ "$selected_id" == "back" ]]; then
-      return 0
+  portable_clear_screen
+  cat >/dev/tty <<EOF
+Server Bootstrap Wizard | Version ${BOOTSTRAP_VERSION} | Action ${ACTION} | Profile ${PROFILE_NAME:-none}
+Module selection (portable mode)
+
+Select one or more modules:
+
+EOF
+
+  for i in "${!ids_ref[@]}"; do
+    id="${ids_ref[$i]}"
+    mark="[ ]"
+    [[ "${marks_ref[$i]:-0}" == "1" ]] && mark="[x]"
+    prefix="  "
+    if ((i == current_index)); then
+      prefix="> "
     fi
-
-    gum style --border rounded --padding "1 2" --margin "1 0" \
-      "$(module_details_text "$selected_id")"
+    printf '%s%s %-16s %s\n' "$prefix" "$mark" "$id" "${MODULE_DESC_BY_ID[$id]}" >/dev/tty
   done
+
+  id="${ids_ref[$current_index]}"
+  cat >/dev/tty <<EOF
+
+Focused module details:
+$(module_details_text "$id")
+
+Keys: Up/Down (or j/k), Space toggle, a all, Enter confirm, q/Esc cancel
+${status_line}
+EOF
 }
 
-show_wizard_banner_gum() {
-  gum style --border double --padding "1 2" --margin "1 0" \
-    --foreground 86 "Server Bootstrap Wizard"
-  gum style --foreground 244 \
-    "Use arrows/enter for navigation. Space toggles multi-select."
-}
+choose_modules_portable() {
+  [[ "$USE_TUI" == "portable" ]] || return 1
+  [[ -t 0 && -t 1 ]] || return 1
 
-choose_modules_gum() {
-  [[ "$USE_TUI" == "gum" ]] || return 1
-  command -v gum >/dev/null 2>&1 || return 1
+  show_portable_intro_once
 
-  show_wizard_banner_gum
+  local -a ids=("${MODULE_IDS[@]}")
+  local -a marks=()
+  local i key status_line selected_count
+  local idx=0
+  for i in "${!ids[@]}"; do
+    marks+=("0")
+  done
 
-  local action
   while true; do
-    action="$(gum choose --header "What would you like to do?" \
-      "Select modules" \
-      "Browse module details" \
-      "Select all modules" \
-      "Cancel")" || {
-      echo "Aborted."
-      exit 0
-    }
-
-    case "$action" in
-    "Browse module details")
-      browse_modules_gum
+    draw_modules_portable ids marks "$idx" "$status_line"
+    key="$(portable_read_key || true)"
+    status_line=""
+    case "$key" in
+    $'\x1b[A' | k)
+      ((idx > 0)) && idx=$((idx - 1))
       ;;
-    "Select all modules")
-      SELECTED_IDS=("${MODULE_IDS[@]}")
+    $'\x1b[B' | j)
+      ((idx < ${#ids[@]} - 1)) && idx=$((idx + 1))
+      ;;
+    " ")
+      if [[ "${marks[$idx]}" == "1" ]]; then
+        marks[$idx]="0"
+      else
+        marks[$idx]="1"
+      fi
+      ;;
+    a | A)
+      selected_count=0
+      for i in "${!ids[@]}"; do
+        [[ "${marks[$i]}" == "1" ]] && selected_count=$((selected_count + 1))
+      done
+      if ((selected_count == ${#ids[@]})); then
+        for i in "${!ids[@]}"; do
+          marks[$i]="0"
+        done
+      else
+        for i in "${!ids[@]}"; do
+          marks[$i]="1"
+        done
+      fi
+      ;;
+    "" | $'\n' | $'\r')
+      SELECTED_IDS=()
+      for i in "${!ids[@]}"; do
+        if [[ "${marks[$i]}" == "1" ]]; then
+          SELECTED_IDS+=("${ids[$i]}")
+        fi
+      done
+      if [[ "${#SELECTED_IDS[@]}" -eq 0 ]]; then
+        status_line="ERROR: no module selected. Toggle with Space."
+        continue
+      fi
+      portable_clear_screen
       return 0
       ;;
-    "Cancel")
-      echo "Aborted."
-      exit 0
-      ;;
-    "Select modules")
-      local lines=()
-      local id
-      for id in "${MODULE_IDS[@]}"; do
-        lines+=("${id} :: ${MODULE_DESC_BY_ID[$id]}")
-      done
-
-      local selection
-      selection="$(gum choose --no-limit --height 15 --header "Select one or more modules" "${lines[@]}")" || return 1
-      [[ -n "$selection" ]] || {
-        gum style --foreground 214 "No module selected. Please select at least one."
-        continue
-      }
-
-      SELECTED_IDS=()
-      local line
-      while IFS= read -r line; do
-        [[ -n "$line" ]] || continue
-        SELECTED_IDS+=("${line%% :: *}")
-      done <<<"$selection"
-
-      gum style --foreground 244 "Selected: ${SELECTED_IDS[*]}"
-      if gum confirm "Proceed with selected modules?"; then
-        return 0
-      fi
+    q | Q | $'\x1b')
+      portable_clear_screen
+      return 1
       ;;
     esac
   done
@@ -982,11 +1102,11 @@ select_modules_interactive() {
     if choose_modules_whiptail; then
       return 0
     fi
-    if choose_modules_gum; then
+    if choose_modules_portable; then
       return 0
     fi
   else
-    if choose_modules_gum; then
+    if choose_modules_portable; then
       return 0
     fi
     if choose_modules_whiptail; then

@@ -42,14 +42,14 @@ Shellcheck note:
 ## TUI Strategy (Current)
 
 - `BOOTSTRAP_TUI=auto` (default) prefers `whiptail` for compatibility.
-- `BOOTSTRAP_TUI=gum` forces modern wizard UI.
+- `BOOTSTRAP_TUI=portable` forces portable Bash wizard.
 - `BOOTSTRAP_TUI=whiptail` forces compatibility wizard.
 - `BOOTSTRAP_TUI=0` disables TUI and uses classic prompts.
-- CLI flags: `--tui-gum`, `--tui-whiptail`.
+- CLI flags: `--tui-portable`, `--tui-whiptail` (`--tui-gum` is compatibility alias).
 
 Important expectation:
 - `whiptail` is intentionally retro (ncurses); improvements there are text/context only.
-- For "modern/wow" CLI experience, use `gum`.
+- Portable mode runs without extra package installation on fresh servers.
 
 ## Remote Bootstrap Mechanics
 

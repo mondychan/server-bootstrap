@@ -73,13 +73,13 @@ sudo ./main.sh --profile prod --modules ssh-keys,docker
 
 ## TUI (Phase A)
 
-Modern TUI wizard is auto-enabled when `gum` or `whiptail` is available.
-In `auto` mode, compatibility-first selection prefers `whiptail` and falls back to `gum`.
+Portable TUI wizard is available without extra dependencies (pure Bash).
+In `auto` mode, compatibility-first selection prefers `whiptail` and falls back to portable TUI.
 
 Use:
 
 - `auto`: prefers `whiptail` (compatibility-first)
-- `gum`: force modern wizard UI
+- `portable`: force portable Bash wizard
 - `whiptail`: force compatibility wizard UI
 - Falls back to classic prompt UI
 
@@ -90,8 +90,10 @@ sudo ./main.sh
 # force compatibility TUI (same behavior as auto in most terminals)
 sudo BOOTSTRAP_TUI=1 ./main.sh
 
-# force modern gum UI
-sudo BOOTSTRAP_TUI=gum ./main.sh
+# force portable TUI
+sudo BOOTSTRAP_TUI=portable ./main.sh
+sudo ./main.sh --tui-portable
+# compatibility alias:
 sudo ./main.sh --tui-gum
 
 # force whiptail explicitly
@@ -130,7 +132,7 @@ The Web GUI calls the same `main.sh` actions (`plan/apply/verify`) underneath.
 - `BOOTSTRAP_DRY_RUN=1` skip apply stage (plan still runs)
 - `BOOTSTRAP_VERBOSE=1` verbose logs
 - `BOOTSTRAP_INTERACTIVE=0` disable prompts
-- `BOOTSTRAP_TUI=auto|gum|whiptail|1|0` pick auto/modern/compat/disabled TUI mode
+- `BOOTSTRAP_TUI=auto|portable|whiptail|1|0` pick auto/portable/compat/disabled TUI mode
 - `BOOTSTRAP_LOG_DIR=/path`
 - `BOOTSTRAP_STATE_DIR=/path`
 - `BOOTSTRAP_LOCK_FILE=/path`

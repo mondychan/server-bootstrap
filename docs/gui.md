@@ -3,12 +3,12 @@
 ## TUI (Phase A)
 
 CLI/TUI is the primary operator path (recommended for headless/remote environments).
-Modern TUI is auto-detected by default.
+Portable TUI is available by default (no extra packages).
 
 `BOOTSTRAP_TUI` modes:
 
 - `auto` (default): use TUI when available, prefer `whiptail` for compatibility.
-- `gum`: force modern gum wizard.
+- `portable`: force portable Bash wizard.
 - `whiptail`: force compatibility wizard.
 - `1`: force TUI mode.
 - `0`: force classic prompt mode.
@@ -16,7 +16,7 @@ Modern TUI is auto-detected by default.
 Selection fallback order:
 
 1. `whiptail` (in `auto`)
-2. `gum`
+2. `portable`
 3. plain prompt
 
 Examples:
@@ -24,7 +24,9 @@ Examples:
 ```bash
 sudo ./main.sh
 sudo BOOTSTRAP_TUI=1 ./main.sh
-sudo BOOTSTRAP_TUI=gum ./main.sh
+sudo BOOTSTRAP_TUI=portable ./main.sh
+sudo ./main.sh --tui-portable
+# compatibility alias:
 sudo ./main.sh --tui-gum
 sudo BOOTSTRAP_TUI=whiptail ./main.sh
 sudo ./main.sh --tui-whiptail
@@ -32,14 +34,14 @@ sudo BOOTSTRAP_TUI=0 ./main.sh
 sudo ./main.sh --tui --plan
 ```
 
-When `gum` is available, the wizard provides:
+Portable/whiptail wizard provides:
 
 - profile picker
 - module browser with details
 - multi-select module chooser
 - explicit confirmation before execution
 
-If your terminal does not render gum correctly (garbled keys/colors), use:
+If your terminal does not render interactive controls correctly, use:
 
 ```bash
 sudo BOOTSTRAP_TUI=0 ./main.sh
