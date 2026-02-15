@@ -79,8 +79,14 @@ module_apply() {
     wg pubkey < "${priv_key_path}" > "${pub_key_path}"
   fi
 
-  echo "WireGuard public key for this server:"
-  cat "${pub_key_path}"
+  local pub_key
+  pub_key="$(cat "${pub_key_path}")"
+  if [[ -t 0 || -r /dev/tty ]]; then
+    printf "WireGuard public key for this server:\n%s\n" "${pub_key}" > /dev/tty
+  else
+    echo "WireGuard public key for this server:"
+    echo "${pub_key}"
+  fi
 
   if [[ -z "${wg_address}" ]]; then
     wg_address="$(prompt_wireguard "WireGuard IP address for this server (e.g. 192.168.70.10/32): " || true)"

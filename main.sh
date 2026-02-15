@@ -15,10 +15,10 @@ if [[ "${BOOTSTRAP_EXTRACTED:-0}" != "1" ]] && [[ -z "${BASH_SOURCE[0]:-}" ]]; t
   USER_REPO_TARBALL_URL="${REPO_TARBALL_URL:-}"
   RESOLVED_REPO_TARBALL_URL="${USER_REPO_TARBALL_URL:-${PINNED_REPO_TARBALL_URL}}"
 
-  if ! curl -fsSL "${RESOLVED_REPO_TARBALL_URL}" -o "${TARBALL}"; then
+  if ! curl -fsSL "${RESOLVED_REPO_TARBALL_URL}" -o "${TARBALL}" 2>/dev/null; then
     if [[ -z "${USER_REPO_TARBALL_URL}" ]]; then
       echo "WARN: failed pinned tarball (${PINNED_REPO_TARBALL_URL}), falling back to main." >&2
-      curl -fsSL "${FALLBACK_REPO_TARBALL_URL}" -o "${TARBALL}"
+      curl -fsSL "${FALLBACK_REPO_TARBALL_URL}" -o "${TARBALL}" 2>/dev/null
     else
       echo "ERROR: failed to download REPO_TARBALL_URL=${USER_REPO_TARBALL_URL}" >&2
       exit 1
@@ -610,6 +610,12 @@ choose_profile_interactive() {
   local answer
   answer="$(prompt "Profile (empty=none, options: ${profiles[*]}): " || true)"
   answer="$(trim "$answer")"
+  case "${answer,,}" in
+    ""|none|no|n|default)
+      PROFILE_NAME=""
+      return 0
+      ;;
+  esac
   if [[ -n "$answer" ]]; then
     PROFILE_NAME="$answer"
   fi

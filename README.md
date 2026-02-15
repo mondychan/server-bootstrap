@@ -21,10 +21,23 @@ Interactive run:
 curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s --
 ```
 
+Short proxy form (interactive):
+
+```bash
+sudo bash -c "$(curl -fsSL https://bootstrap.cocoit.cz)"
+```
+
 Run all (non-interactive):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo BOOTSTRAP_INTERACTIVE=0 bash -s --
+```
+
+Short proxy form with args/env:
+
+```bash
+curl -fsSL https://bootstrap.cocoit.cz | sudo BOOTSTRAP_INTERACTIVE=0 bash -s --
+curl -fsSL https://bootstrap.cocoit.cz | sudo bash -s -- --plan --modules docker
 ```
 
 ## CLI actions
