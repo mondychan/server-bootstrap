@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.6] - 2026-02-15
+
+### Changed
+- Bumped pinned bootstrap version to `0.2.6` so stdin/short bootstrap resolves current release tag instead of older `v0.2.4`.
+- Improved whiptail wizard UX with runtime backtitle (version/action/profile/run id), onboarding intro dialog, and clearer profile/module selection text.
+- Fixed lock directory handling for non-root apply/dry-run flows to avoid permission errors on existing lock parent directories.
+- Stabilized CI checks (`shfmt`, `shellcheck`, `bats`) after dynamic module framework hardening.
+
 ## [0.2.4] - 2026-02-15
 
 ### Changed
