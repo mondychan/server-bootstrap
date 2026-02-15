@@ -78,6 +78,45 @@ For every release meant to be reachable via short bootstrap, always synchronize:
 
 If one is missing, users can receive older code despite newer `main`.
 
+## Release SOP (Exact Procedure)
+
+Use this exact order every time:
+
+1. Preflight
+   - `git status --short` must be clean.
+   - decide next version `<x.y.z>` (never reuse existing tag version).
+2. Edit release files in one change
+   - set `main.sh` `BOOTSTRAP_VERSION="<x.y.z>"`
+   - set `VERSION` to `<x.y.z>`
+   - add `CHANGELOG.md` section `[<x.y.z>]`
+3. Commit release only
+   - `git add main.sh VERSION CHANGELOG.md`
+   - `git commit -m "release: v<x.y.z>"`
+4. Push release commit first
+   - `git push origin main`
+5. Tag that exact release commit
+   - `git tag -a v<x.y.z> -m "Release v<x.y.z>"`
+   - `git push origin v<x.y.z>`
+6. Verify mapping
+   - `git ls-remote https://github.com/mondychan/server-bootstrap.git refs/heads/main refs/tags/v<x.y.z> refs/tags/v<x.y.z>^{}`
+   - `refs/tags/v<x.y.z>^{}` must resolve to intended release commit.
+
+Never do:
+- do not create a version tag on a feature/docs commit.
+- do not tag before version files are bumped.
+- do not reuse/move an already published tag; create next patch version instead (e.g. `0.2.8` -> `0.2.9`).
+
+Quick safe command block (after manual file edits):
+
+```bash
+git add main.sh VERSION CHANGELOG.md
+git commit -m "release: v<x.y.z>"
+git push origin main
+git tag -a v<x.y.z> -m "Release v<x.y.z>"
+git push origin v<x.y.z>
+git ls-remote https://github.com/mondychan/server-bootstrap.git refs/heads/main refs/tags/v<x.y.z> refs/tags/v<x.y.z>^{}
+```
+
 ## CI and Quality Gates
 
 CI job `lint-test` runs:
