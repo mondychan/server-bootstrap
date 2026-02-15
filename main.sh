@@ -147,9 +147,14 @@ log_line() {
 }
 
 log() { log_line "INFO" "$*"; }
+# shellcheck disable=SC2317
 warn() { log_line "WARN" "$*"; }
 err() { log_line "ERROR" "$*"; }
-vlog() { [[ "${BOOTSTRAP_VERBOSE:-0}" == "1" ]] && log_line "VERBOSE" "$*" || true; }
+vlog() {
+  if [[ "${BOOTSTRAP_VERBOSE:-0}" == "1" ]]; then
+    log_line "VERBOSE" "$*"
+  fi
+}
 
 emit_event() {
   local event="$1"
@@ -170,6 +175,7 @@ emit_event() {
     "$(json_escape "$details")" >>"${EVENT_LOG_FILE}" || true
 }
 
+# shellcheck disable=SC2317
 cleanup_lock() {
   if [[ "$LOCK_HELD" -eq 1 ]]; then
     flock -u 9 || true
@@ -180,6 +186,7 @@ cleanup_lock() {
   fi
 }
 
+# shellcheck disable=SC2317
 cleanup() {
   cleanup_lock
 }
@@ -457,6 +464,7 @@ load_module() {
 
   if ! declare -F module_apply >/dev/null 2>&1; then
     if declare -F module_run >/dev/null 2>&1; then
+      # shellcheck disable=SC2317
       module_apply() { module_run; }
     else
       echo "ERROR: module must define module_apply() or module_run(): $path" >&2
@@ -465,12 +473,14 @@ load_module() {
   fi
 
   if ! declare -F module_plan >/dev/null 2>&1; then
+    # shellcheck disable=SC2317
     module_plan() {
       echo "Plan: ${module_desc}"
     }
   fi
 
   if ! declare -F module_verify >/dev/null 2>&1; then
+    # shellcheck disable=SC2317
     module_verify() { return 0; }
   fi
 }
@@ -494,6 +504,7 @@ index_modules() {
     fi
 
     deps_text=""
+    # shellcheck disable=SC2154
     if declare -p module_deps >/dev/null 2>&1; then
       # shellcheck disable=SC2154
       deps_text="${module_deps[*]}"

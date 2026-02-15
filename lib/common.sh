@@ -38,6 +38,10 @@ apt_update_once() {
   fi
 }
 
+apt_mark_stale() {
+  SB_APT_UPDATED="0"
+}
+
 safe_write_file() {
   local target="$1"
   local mode="$2"

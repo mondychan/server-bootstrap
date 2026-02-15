@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck disable=SC2034
+# Module metadata variables are consumed dynamically by main.sh after sourcing this file.
 
 module_id="docker"
 module_desc="Install Docker Engine + Compose plugin (Ubuntu via official repo)"
@@ -80,7 +82,7 @@ Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
   echo "Installing Docker packages"
-  SB_APT_UPDATED=0
+  apt_mark_stale
   apt_update_once
 
   DEBIAN_FRONTEND=noninteractive apt-get -y -qq -o Dpkg::Progress-Fancy=1 install \

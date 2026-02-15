@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck disable=SC2034
+# Module metadata variables are consumed dynamically by main.sh after sourcing this file.
 
 module_id="webmin"
 module_desc="Install Webmin and enable the service (default port 10000)"
@@ -100,7 +102,7 @@ module_apply() {
     setup_webmin_repo_apt
 
     echo "Installing Webmin"
-    SB_APT_UPDATED=0
+    apt_mark_stale
     apt_update_once
 
     if [[ -n "$webmin_version" ]]; then
