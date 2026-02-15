@@ -31,9 +31,9 @@ setup_webmin_repo_apt() {
   rm -f /etc/apt/sources.list.d/webmin.repo
 
   if [[ -d /etc/apt/sources.list.d ]]; then
-    find /etc/apt/sources.list.d -maxdepth 1 -type f -name '*.list' -print0 \
-      | xargs -0 -r grep -l 'download\.webmin\.com/download/repository' \
-      | xargs -r rm -f
+    find /etc/apt/sources.list.d -maxdepth 1 -type f -name '*.list' -print0 |
+      xargs -0 -r grep -l 'download\.webmin\.com/download/repository' |
+      xargs -r rm -f
   fi
   if [[ -f /etc/apt/sources.list ]]; then
     sed -i '/download\.webmin\.com\/download\/repository/d' /etc/apt/sources.list

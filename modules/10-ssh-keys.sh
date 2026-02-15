@@ -206,7 +206,7 @@ module_verify() {
 
   local verify_tmp
   verify_tmp="$(mktemp)"
-  if ! curl -fsSL "https://github.com/${gh_user}.keys" > "${verify_tmp}"; then
+  if ! curl -fsSL "https://github.com/${gh_user}.keys" >"${verify_tmp}"; then
     echo "ERROR: failed to fetch https://github.com/${gh_user}.keys for verification" >&2
     rm -f "${verify_tmp}"
     exit 1

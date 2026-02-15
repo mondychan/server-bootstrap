@@ -42,9 +42,9 @@ module_apply() {
   require_cmd apt-get dpkg awk xargs curl systemctl
 
   echo "Removing conflicting packages (if any)"
-  dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null \
-    | awk '{print $1}' \
-    | xargs -r apt-get -y remove
+  dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null |
+    awk '{print $1}' |
+    xargs -r apt-get -y remove
 
   echo "Cleaning legacy Docker repo entries"
   rm -f /etc/apt/sources.list.d/docker.list
@@ -52,9 +52,9 @@ module_apply() {
   rm -f /etc/apt/sources.list.d/docker.sources
   rm -f /etc/apt/sources.list.d/download.docker.com.list
   if [[ -d /etc/apt/sources.list.d ]]; then
-    find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0 \
-      | xargs -0 -r grep -l 'download\.docker\.com/linux/ubuntu' \
-      | xargs -r rm -f || true
+    find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0 |
+      xargs -0 -r grep -l 'download\.docker\.com/linux/ubuntu' |
+      xargs -r rm -f || true
   fi
   if [[ -f /etc/apt/sources.list ]]; then
     sed -i '/download\.docker\.com\/linux\/ubuntu/d' /etc/apt/sources.list

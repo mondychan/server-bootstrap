@@ -11,11 +11,11 @@ prompt_wireguard() {
   local reply=""
 
   if [[ -t 0 ]]; then
-    printf "%s" "$message" > /dev/tty
+    printf "%s" "$message" >/dev/tty
     read -r reply
   elif [[ -r /dev/tty ]]; then
-    printf "%s" "$message" > /dev/tty
-    read -r reply < /dev/tty
+    printf "%s" "$message" >/dev/tty
+    read -r reply </dev/tty
   else
     return 1
   fi
@@ -52,11 +52,11 @@ module_apply() {
     exit 1
   fi
   case "$wg_test" in
-    ask|0|1) ;;
-    *)
-      echo "ERROR: invalid WG_TEST='$wg_test' (expected ask, 0, or 1)" >&2
-      exit 1
-      ;;
+  ask | 0 | 1) ;;
+  *)
+    echo "ERROR: invalid WG_TEST='$wg_test' (expected ask, 0, or 1)" >&2
+    exit 1
+    ;;
   esac
 
   require_cmd apt-get systemctl
@@ -76,13 +76,13 @@ module_apply() {
   if [[ ! -f "${priv_key_path}" ]]; then
     umask 077
     wg genkey | tee "${priv_key_path}" >/dev/null
-    wg pubkey < "${priv_key_path}" > "${pub_key_path}"
+    wg pubkey <"${priv_key_path}" >"${pub_key_path}"
   fi
 
   local pub_key
   pub_key="$(cat "${pub_key_path}")"
   if [[ -t 0 || -r /dev/tty ]]; then
-    printf "WireGuard public key for this server:\n%s\n" "${pub_key}" > /dev/tty
+    printf "WireGuard public key for this server:\n%s\n" "${pub_key}" >/dev/tty
   else
     echo "WireGuard public key for this server:"
     echo "${pub_key}"

@@ -98,7 +98,7 @@ validate_bool_01() {
 validate_port() {
   local value="$1"
   [[ "$value" =~ ^[0-9]{1,5}$ ]] || return 1
-  (( value >= 1 && value <= 65535 ))
+  ((value >= 1 && value <= 65535))
 }
 
 validate_interface_name() {
@@ -111,7 +111,7 @@ validate_ipv4() {
   [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
   local a b c d
   IFS='.' read -r a b c d <<<"$ip"
-  (( a <= 255 && b <= 255 && c <= 255 && d <= 255 ))
+  ((a <= 255 && b <= 255 && c <= 255 && d <= 255))
 }
 
 validate_ipv4_cidr() {
