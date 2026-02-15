@@ -2,10 +2,13 @@
 
 ## TUI (Phase A)
 
-Use TUI selectors by enabling:
+Modern TUI is auto-detected by default.
 
-- `--tui`, or
-- `BOOTSTRAP_TUI=1`
+`BOOTSTRAP_TUI` modes:
+
+- `auto` (default): use TUI when available.
+- `1`: force TUI mode.
+- `0`: force classic prompt mode.
 
 Selection fallback order:
 
@@ -16,9 +19,18 @@ Selection fallback order:
 Examples:
 
 ```bash
+sudo ./main.sh
 sudo BOOTSTRAP_TUI=1 ./main.sh
+sudo BOOTSTRAP_TUI=0 ./main.sh
 sudo ./main.sh --tui --plan
 ```
+
+When `gum` is available, the wizard provides:
+
+- profile picker
+- module browser with details
+- multi-select module chooser
+- explicit confirmation before execution
 
 ## Web GUI (Phase B)
 

@@ -7,6 +7,7 @@
 - Improved interactive profile prompt handling (`none`/`default` is treated as no profile).
 - Reduced noisy download output in stdin bootstrap fallback path.
 - WireGuard interactive output ordering improved so public key prints cleanly around prompts.
+- Improved interactive CLI with modern gum wizard flow (profile picker, module detail browser, richer multi-select, clearer progress output).
 
 ## [0.2.0] - 2026-02-15
 

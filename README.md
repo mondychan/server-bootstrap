@@ -73,14 +73,23 @@ sudo ./main.sh --profile prod --modules ssh-keys,docker
 
 ## TUI (Phase A)
 
-Enable TUI selectors with `--tui` or `BOOTSTRAP_TUI=1`.
+Modern TUI wizard is auto-enabled when `gum` or `whiptail` is available.
+
+Use:
 
 - Uses `gum` when available
 - Falls back to `whiptail`
 - Falls back to classic prompt UI
 
 ```bash
+# auto (default)
+sudo ./main.sh
+
+# force TUI on
 sudo BOOTSTRAP_TUI=1 ./main.sh
+
+# force classic prompts
+sudo BOOTSTRAP_TUI=0 ./main.sh
 ```
 
 ## Web GUI (Phase B)
@@ -105,7 +114,7 @@ The Web GUI calls the same `main.sh` actions (`plan/apply/verify`) underneath.
 - `BOOTSTRAP_DRY_RUN=1` skip apply stage (plan still runs)
 - `BOOTSTRAP_VERBOSE=1` verbose logs
 - `BOOTSTRAP_INTERACTIVE=0` disable prompts
-- `BOOTSTRAP_TUI=1` prefer TUI selectors
+- `BOOTSTRAP_TUI=auto|1|0` auto/force modern TUI off or on
 - `BOOTSTRAP_LOG_DIR=/path`
 - `BOOTSTRAP_STATE_DIR=/path`
 - `BOOTSTRAP_LOCK_FILE=/path`

@@ -61,7 +61,7 @@ Profile file naming rules are validated (`[a-zA-Z0-9._-]+`).
 - `BOOTSTRAP_DRY_RUN=1`
 - `BOOTSTRAP_VERBOSE=1`
 - `BOOTSTRAP_INTERACTIVE=0`
-- `BOOTSTRAP_TUI=1`
+- `BOOTSTRAP_TUI=auto|1|0`
 - `BOOTSTRAP_LOG_DIR=<path>`
 - `BOOTSTRAP_STATE_DIR=<path>`
 - `BOOTSTRAP_LOCK_FILE=<path>`

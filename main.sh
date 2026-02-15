@@ -54,7 +54,7 @@ source "${LIB_DIR}/common.sh"
 
 ACTION="apply"
 INTERACTIVE="${BOOTSTRAP_INTERACTIVE:-1}"
-USE_TUI="${BOOTSTRAP_TUI:-0}"
+USE_TUI="${BOOTSTRAP_TUI:-auto}"
 LIST_ONLY=0
 LIST_JSON=0
 LIST_PROFILES=0
@@ -127,7 +127,7 @@ Env vars (global):
   BOOTSTRAP_DRY_RUN=1        skip apply stage, keep planning
   BOOTSTRAP_VERBOSE=1        verbose logs
   BOOTSTRAP_INTERACTIVE=0    disable interactive selection
-  BOOTSTRAP_TUI=1            prefer TUI selectors
+  BOOTSTRAP_TUI=auto|1|0     auto-detect modern TUI (gum/whiptail), force on/off
   BOOTSTRAP_LOG_DIR=<path>   override log directory
   BOOTSTRAP_STATE_DIR=<path> override state directory
   BOOTSTRAP_LOCK_FILE=<path> override lock file
@@ -388,6 +388,28 @@ parse_args() {
   done
 }
 
+normalize_tui_setting() {
+  case "${USE_TUI,,}" in
+    1|true|yes|on)
+      USE_TUI="1"
+      ;;
+    0|false|no|off)
+      USE_TUI="0"
+      ;;
+    auto|"")
+      if command -v gum >/dev/null 2>&1 || command -v whiptail >/dev/null 2>&1; then
+        USE_TUI="1"
+      else
+        USE_TUI="0"
+      fi
+      ;;
+    *)
+      echo "ERROR: invalid BOOTSTRAP_TUI value: ${USE_TUI}" >&2
+      exit 2
+      ;;
+  esac
+}
+
 discover_module_paths() {
   if [[ ! -d "$MODULE_DIR" ]]; then
     echo "ERROR: module dir not found: $MODULE_DIR" >&2
@@ -591,6 +613,26 @@ choose_profile_interactive() {
   discover_profiles profiles
   [[ "${#profiles[@]}" -eq 0 ]] && return 0
 
+  if [[ "$USE_TUI" == "1" ]] && command -v gum >/dev/null 2>&1; then
+    local profile_lines=()
+    local p picked selected_name
+    profile_lines+=("none :: No profile (module defaults)")
+    for p in "${profiles[@]}"; do
+      profile_lines+=("${p} :: Load profiles/${p}.env")
+    done
+
+    picked="$(printf '%s\n' "${profile_lines[@]}" \
+      | gum choose --header "Select profile")" || {
+      echo "Aborted."
+      exit 0
+    }
+    selected_name="${picked%% :: *}"
+    if [[ "$selected_name" != "none" ]]; then
+      PROFILE_NAME="$selected_name"
+    fi
+    return 0
+  fi
+
   if [[ "$USE_TUI" == "1" ]] && command -v whiptail >/dev/null 2>&1; then
     local options=("none" "No profile")
     local p
@@ -621,16 +663,113 @@ choose_profile_interactive() {
   fi
 }
 
+module_details_text() {
+  local id="$1"
+  local deps env path
+  deps="${MODULE_DEPS_BY_ID[$id]:-}"
+  env="${MODULE_ENV_BY_ID[$id]:-none}"
+  path="${MODULE_PATH_BY_ID[$id]:-unknown}"
+
+  if [[ -z "$deps" ]]; then
+    deps="none"
+  fi
+
+  cat <<EOF
+Module: ${id}
+Description: ${MODULE_DESC_BY_ID[$id]}
+Dependencies: ${deps}
+Environment: ${env}
+Source: ${path}
+EOF
+}
+
+browse_modules_gum() {
+  local lines=()
+  local id
+  for id in "${MODULE_IDS[@]}"; do
+    lines+=("${id} :: ${MODULE_DESC_BY_ID[$id]}")
+  done
+
+  while true; do
+    local picked
+    picked="$(printf '%s\n' "${lines[@]}" "back :: Return to selection" \
+      | gum choose --header "Browse modules")" || return 0
+    local selected_id="${picked%% :: *}"
+    if [[ "$selected_id" == "back" ]]; then
+      return 0
+    fi
+
+    gum style --border rounded --padding "1 2" --margin "1 0" \
+      "$(module_details_text "$selected_id")"
+  done
+}
+
+show_wizard_banner_gum() {
+  gum style --border double --padding "1 2" --margin "1 0" \
+    --foreground 86 "Server Bootstrap Wizard"
+  gum style --foreground 244 \
+    "Use arrows/enter for navigation. Space toggles multi-select."
+}
+
 choose_modules_gum() {
   [[ "$USE_TUI" == "1" ]] || return 1
   command -v gum >/dev/null 2>&1 || return 1
 
-  local selection
-  selection="$(printf '%s\n' "${MODULE_IDS[@]}" | gum choose --no-limit --header "Select modules")" || return 1
-  [[ -n "$selection" ]] || return 1
+  show_wizard_banner_gum
 
-  mapfile -t SELECTED_IDS <<<"$selection"
-  return 0
+  local action
+  while true; do
+    action="$(printf '%s\n' \
+      "Select modules" \
+      "Browse module details" \
+      "Select all modules" \
+      "Cancel" \
+      | gum choose --header "What would you like to do?")" || {
+      echo "Aborted."
+      exit 0
+    }
+
+    case "$action" in
+      "Browse module details")
+        browse_modules_gum
+        ;;
+      "Select all modules")
+        SELECTED_IDS=("${MODULE_IDS[@]}")
+        return 0
+        ;;
+      "Cancel")
+        echo "Aborted."
+        exit 0
+        ;;
+      "Select modules")
+        local lines=()
+        local id
+        for id in "${MODULE_IDS[@]}"; do
+          lines+=("${id} :: ${MODULE_DESC_BY_ID[$id]}")
+        done
+
+        local selection
+        selection="$(printf '%s\n' "${lines[@]}" \
+          | gum choose --no-limit --height 15 --header "Select one or more modules")" || return 1
+        [[ -n "$selection" ]] || {
+          gum style --foreground 214 "No module selected. Please select at least one."
+          continue
+        }
+
+        SELECTED_IDS=()
+        local line
+        while IFS= read -r line; do
+          [[ -n "$line" ]] || continue
+          SELECTED_IDS+=("${line%% :: *}")
+        done <<<"$selection"
+
+        gum style --foreground 244 "Selected: ${SELECTED_IDS[*]}"
+        if gum confirm "Proceed with selected modules?"; then
+          return 0
+        fi
+        ;;
+    esac
+  done
 }
 
 choose_modules_whiptail() {
@@ -685,6 +824,8 @@ choose_modules_prompt() {
           echo "ERROR: invalid selection index: $token" >&2
           exit 2
         fi
+      elif [[ -n "${MODULE_PATH_BY_ID[$token]:-}" ]]; then
+        SELECTED_IDS+=("$token")
       else
         echo "ERROR: invalid token: $token" >&2
         exit 2
@@ -949,6 +1090,8 @@ should_require_root() {
 run_modules() {
   local module_id
   local failures=0
+  local total="${#ORDERED_IDS[@]}"
+  local idx=0
 
   log "Selected modules: ${SELECTED_IDS[*]}"
   log "Execution order: ${ORDERED_IDS[*]}"
@@ -957,6 +1100,8 @@ run_modules() {
   log "Dry-run: ${BOOTSTRAP_DRY_RUN:-0}"
 
   for module_id in "${ORDERED_IDS[@]}"; do
+    idx=$((idx + 1))
+    log "Progress: module ${idx}/${total} (${module_id})"
     if ! run_one_module "$module_id"; then
       failures=$((failures + 1))
       if [[ "${BOOTSTRAP_CONTINUE_ON_ERROR:-0}" != "1" ]]; then
@@ -977,6 +1122,7 @@ run_modules() {
 
 main() {
   parse_args "$@"
+  normalize_tui_setting
   index_modules
 
   if [[ "$LIST_ONLY" -eq 1 ]]; then
