@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="0.2.15"
+BOOTSTRAP_VERSION="0.2.16"
 BOOTSTRAP_GIT_HASH="${BOOTSTRAP_GIT_HASH:-dev}"
 PINNED_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/tags/v${BOOTSTRAP_VERSION}.tar.gz"
 FALLBACK_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz"

@@ -146,7 +146,7 @@ Default paths:
 
 | Module ID | Purpose | Key env vars |
 | --- | --- | --- |
-| `ssh-keys` | Sync `authorized_keys` from GitHub via systemd timer + SSH hardening. | `GH_USER`, `USERNAME`, `INTERVAL_MIN` |
+| `ssh-keys` | Sync `authorized_keys` from GitHub via systemd timer + SSH hardening. | `GH_USER`, `USERNAME`, `INTERVAL_MIN`, `SSH_REQUIRE_SERVER`, `SSH_AUTO_INSTALL` |
 | `webmin` | Install Webmin from official repository, verify service. | `WEBMIN_PORT`, `WEBMIN_VERSION`, `WEBMIN_KEY_SHA256`, `WEBMIN_STRICT_KEY_CHECK` |
 | `docker` | Install Docker Engine + Compose plugin from official repo. | `DOCKER_HELLO` |
 | `wireguard` | WireGuard client setup to `vpn.cocoit.cz`. | `WG_ADDRESS`, `WG_INTERFACE`, `WG_CONFIRM`, `WG_TEST` |

@@ -36,6 +36,8 @@ Key env vars:
 - `GH_USER` (default `mondychan`)
 - `USERNAME` (default `root`)
 - `INTERVAL_MIN` (default `15`)
+- `SSH_REQUIRE_SERVER` (`1` default, require SSH server presence; set `0` to allow key-sync-only mode)
+- `SSH_AUTO_INSTALL` (`1` default, auto-install SSH server when missing if `SSH_REQUIRE_SERVER=1`)
 
 Security behavior:
 - Backs up `sshd_config` before edits.

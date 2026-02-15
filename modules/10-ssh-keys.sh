@@ -5,8 +5,76 @@ set -euo pipefail
 
 module_id="ssh-keys"
 module_desc="Sync authorized_keys from GitHub via systemd timer (root by default)"
-module_env="GH_USER, USERNAME, INTERVAL_MIN"
+module_env="GH_USER, USERNAME, INTERVAL_MIN, SSH_REQUIRE_SERVER, SSH_AUTO_INSTALL"
 module_deps=()
+
+detect_ssh_service_name() {
+  if systemctl list-unit-files --type=service | grep -q '^sshd\.service'; then
+    printf 'sshd'
+    return 0
+  fi
+  if systemctl list-unit-files --type=service | grep -q '^ssh\.service'; then
+    printf 'ssh'
+    return 0
+  fi
+  return 1
+}
+
+ensure_ssh_server_present() {
+  local sshd_config="/etc/ssh/sshd_config"
+  local missing=()
+
+  if ! command -v sshd >/dev/null 2>&1; then
+    missing+=("sshd binary")
+  fi
+  if [[ ! -f "$sshd_config" ]]; then
+    missing+=("$sshd_config")
+  fi
+  if ! detect_ssh_service_name >/dev/null 2>&1; then
+    missing+=("ssh/sshd systemd service")
+  fi
+
+  if ((${#missing[@]} > 0)); then
+    echo "ERROR: SSH server prerequisites missing: ${missing[*]}" >&2
+    echo "ERROR: install openssh-server (or equivalent) before running module 'ssh-keys'" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+install_ssh_server() {
+  local os_id=""
+  local os_like=""
+
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    os_id="${ID:-}"
+    os_like="${ID_LIKE:-}"
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    require_cmd apt-get
+    apt_mark_stale
+    apt_update_once
+    DEBIAN_FRONTEND=noninteractive apt-get -y -qq install openssh-server >/dev/null
+    return 0
+  fi
+
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y openssh-server
+    return 0
+  fi
+
+  if command -v yum >/dev/null 2>&1; then
+    yum install -y openssh-server
+    return 0
+  fi
+
+  echo "ERROR: cannot auto-install SSH server (no apt-get/dnf/yum). ID=${os_id} ID_LIKE=${os_like}" >&2
+  return 1
+}
 
 resolve_home_dir() {
   local target_user="$1"
@@ -67,9 +135,12 @@ module_plan() {
   local gh_user="${GH_USER:-mondychan}"
   local target_user="${USERNAME:-root}"
   local interval_min="${INTERVAL_MIN:-15}"
+  local ssh_require_server="${SSH_REQUIRE_SERVER:-1}"
+  local ssh_auto_install="${SSH_AUTO_INSTALL:-1}"
 
   echo "Plan: create sync script + systemd timer for GitHub SSH keys"
   echo "Plan: GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min}"
+  echo "Plan: SSH_REQUIRE_SERVER=${ssh_require_server}, SSH_AUTO_INSTALL=${ssh_auto_install}"
   echo "Plan: enforce SSH key-only login in /etc/ssh/sshd_config with rollback-safe validation"
 }
 
@@ -77,6 +148,8 @@ module_apply() {
   local gh_user="${GH_USER:-mondychan}"
   local target_user="${USERNAME:-root}"
   local interval_min="${INTERVAL_MIN:-15}"
+  local ssh_require_server="${SSH_REQUIRE_SERVER:-1}"
+  local ssh_auto_install="${SSH_AUTO_INSTALL:-1}"
   local sshd_config="/etc/ssh/sshd_config"
 
   if [[ -z "$gh_user" || ! "$gh_user" =~ ^[a-zA-Z0-9-]{1,39}$ ]]; then
@@ -91,8 +164,29 @@ module_apply() {
     echo "ERROR: invalid INTERVAL_MIN='$interval_min' (expected positive integer)" >&2
     exit 1
   fi
+  if ! validate_bool_01 "$ssh_require_server"; then
+    echo "ERROR: invalid SSH_REQUIRE_SERVER='$ssh_require_server' (expected 0 or 1)" >&2
+    exit 1
+  fi
+  if ! validate_bool_01 "$ssh_auto_install"; then
+    echo "ERROR: invalid SSH_AUTO_INSTALL='$ssh_auto_install' (expected 0 or 1)" >&2
+    exit 1
+  fi
 
   require_cmd curl systemctl install getent diff
+
+  if [[ "$ssh_require_server" == "1" ]]; then
+    if ! ensure_ssh_server_present; then
+      if [[ "$ssh_auto_install" == "1" ]]; then
+        echo "WARN: SSH server missing; attempting automatic installation" >&2
+        install_ssh_server
+        ensure_ssh_server_present
+      else
+        echo "ERROR: SSH server missing and SSH_AUTO_INSTALL=0" >&2
+        exit 1
+      fi
+    fi
+  fi
 
   local home_dir
   home_dir="$(resolve_home_dir "$target_user")"
@@ -165,7 +259,15 @@ EOF
   systemctl enable --now "${timer_name}"
   systemctl start "${service_name}"
 
-  harden_sshd_config "$sshd_config"
+  if [[ "$ssh_require_server" == "1" ]]; then
+    harden_sshd_config "$sshd_config"
+  else
+    if ensure_ssh_server_present; then
+      harden_sshd_config "$sshd_config"
+    else
+      echo "WARN: SSH_REQUIRE_SERVER=0 and SSH server missing; skipped SSH hardening" >&2
+    fi
+  fi
 
   echo "OK: ${service_name} + ${timer_name} installed (GH_USER=${gh_user}, USERNAME=${target_user}, INTERVAL_MIN=${interval_min})"
 }
@@ -173,6 +275,21 @@ EOF
 module_verify() {
   local gh_user="${GH_USER:-mondychan}"
   local target_user="${USERNAME:-root}"
+  local ssh_require_server="${SSH_REQUIRE_SERVER:-1}"
+  local ssh_auto_install="${SSH_AUTO_INSTALL:-1}"
+
+  if ! validate_bool_01 "$ssh_require_server"; then
+    echo "ERROR: invalid SSH_REQUIRE_SERVER='$ssh_require_server' (expected 0 or 1)" >&2
+    exit 1
+  fi
+  if ! validate_bool_01 "$ssh_auto_install"; then
+    echo "ERROR: invalid SSH_AUTO_INSTALL='$ssh_auto_install' (expected 0 or 1)" >&2
+    exit 1
+  fi
+
+  if [[ "$ssh_require_server" == "1" ]]; then
+    ensure_ssh_server_present
+  fi
 
   local home_dir script_path service_name timer_name ssh_dir auth_keys
   home_dir="$(resolve_home_dir "$target_user")"

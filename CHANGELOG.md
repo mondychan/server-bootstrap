@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.16] - 2026-02-15
+
+### Changed
+- Improved `ssh-keys` module behavior when SSH server is missing:
+  - added `SSH_AUTO_INSTALL=1` default to auto-install `openssh-server` (or distro equivalent)
+  - added stricter SSH server presence checks with clearer failure messages
+  - kept opt-out path for key-sync-only mode via `SSH_REQUIRE_SERVER=0`
+- Extended profile and docs coverage for new SSH options:
+  - added `SSH_AUTO_INSTALL=1` to `profiles/dev.env` and `profiles/prod.env`
+  - updated module environment docs in `README.md` and `docs/modules.md`
+
 ## [0.2.15] - 2026-02-15
 
 ### Fixed
