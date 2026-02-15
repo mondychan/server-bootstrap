@@ -74,13 +74,12 @@ sudo ./main.sh --profile prod --modules ssh-keys,docker
 ## TUI (Phase A)
 
 Portable TUI wizard is available without extra dependencies (pure Bash).
-In `auto` mode, compatibility-first selection prefers `whiptail` and falls back to portable TUI.
+In `auto` mode, bootstrap uses portable TUI when an interactive terminal is available.
 
 Use:
 
-- `auto`: prefers `whiptail` (compatibility-first)
+- `auto`: enables portable TUI on interactive terminal
 - `portable`: force portable Bash wizard
-- `whiptail`: force compatibility wizard UI
 - Falls back to classic prompt UI
 
 ```bash
@@ -93,12 +92,6 @@ sudo BOOTSTRAP_TUI=1 ./main.sh
 # force portable TUI
 sudo BOOTSTRAP_TUI=portable ./main.sh
 sudo ./main.sh --tui-portable
-# compatibility alias:
-sudo ./main.sh --tui-gum
-
-# force whiptail explicitly
-sudo BOOTSTRAP_TUI=whiptail ./main.sh
-sudo ./main.sh --tui-whiptail
 
 # force classic prompts
 sudo BOOTSTRAP_TUI=0 ./main.sh
@@ -132,7 +125,7 @@ The Web GUI calls the same `main.sh` actions (`plan/apply/verify`) underneath.
 - `BOOTSTRAP_DRY_RUN=1` skip apply stage (plan still runs)
 - `BOOTSTRAP_VERBOSE=1` verbose logs
 - `BOOTSTRAP_INTERACTIVE=0` disable prompts
-- `BOOTSTRAP_TUI=auto|portable|whiptail|1|0` pick auto/portable/compat/disabled TUI mode
+- `BOOTSTRAP_TUI=auto|portable|1|0` pick auto/portable/disabled TUI mode
 - `BOOTSTRAP_LOG_DIR=/path`
 - `BOOTSTRAP_STATE_DIR=/path`
 - `BOOTSTRAP_LOCK_FILE=/path`
@@ -156,6 +149,8 @@ Default paths:
 | `webmin` | Install Webmin from official repository, verify service. | `WEBMIN_PORT`, `WEBMIN_VERSION`, `WEBMIN_KEY_SHA256`, `WEBMIN_STRICT_KEY_CHECK` |
 | `docker` | Install Docker Engine + Compose plugin from official repo. | `DOCKER_HELLO` |
 | `wireguard` | WireGuard client setup to `vpn.cocoit.cz`. | `WG_ADDRESS`, `WG_INTERFACE`, `WG_CONFIRM`, `WG_TEST` |
+| `unattended-upgrades` | Enable automatic security updates via APT unattended-upgrades. | `UAU_AUTO_REBOOT`, `UAU_AUTO_REBOOT_TIME`, `UAU_REMOVE_UNUSED`, `UAU_UPDATE_PACKAGE_LISTS`, `UAU_UNATTENDED_UPGRADE` |
+| `time-sync` | Configure timezone and NTP sync via systemd-timesyncd. | `TS_TIMEZONE`, `TS_NTP_SERVERS`, `TS_FALLBACK_NTP`, `TS_STRICT_SYNC`, `TS_SYNC_TIMEOUT_SEC` |
 
 ## Security note (Webmin key pinning)
 

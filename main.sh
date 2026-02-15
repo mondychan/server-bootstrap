@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="0.2.12"
+BOOTSTRAP_VERSION="0.2.13"
 BOOTSTRAP_GIT_HASH="${BOOTSTRAP_GIT_HASH:-dev}"
 PINNED_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/tags/v${BOOTSTRAP_VERSION}.tar.gz"
 FALLBACK_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz"
@@ -116,10 +116,8 @@ Options:
   --verify               run verify stage only
   --modules <csv>        comma-separated module IDs
   --profile <name>       load profiles/<name>.env
-  --tui                  force TUI selector (portable/whiptail)
+  --tui                  force portable TUI selector
   --tui-portable         force portable Bash wizard (no extra dependencies)
-  --tui-gum              compatibility alias for --tui-portable
-  --tui-whiptail         force whiptail wizard (max compatibility)
   --no-interactive       disable prompts and interactive selection
   --list                 list modules in text format
   --list-json            list modules as JSON
@@ -131,8 +129,8 @@ Env vars (global):
   BOOTSTRAP_DRY_RUN=1        skip apply stage, keep planning
   BOOTSTRAP_VERBOSE=1        verbose logs
   BOOTSTRAP_INTERACTIVE=0    disable interactive selection
-  BOOTSTRAP_TUI=auto|portable|whiptail|1|0
-                             auto prefers whiptail; portable/whiptail force concrete UI
+  BOOTSTRAP_TUI=auto|portable|1|0
+                             auto prefers portable; portable forces concrete TUI
   BOOTSTRAP_LOG_DIR=<path>   override log directory
   BOOTSTRAP_STATE_DIR=<path> override state directory
   BOOTSTRAP_LOCK_FILE=<path> override lock file
@@ -395,14 +393,6 @@ parse_args() {
       USE_TUI="portable"
       shift
       ;;
-    --tui-gum)
-      USE_TUI="portable"
-      shift
-      ;;
-    --tui-whiptail)
-      USE_TUI="whiptail"
-      shift
-      ;;
     --no-interactive)
       INTERACTIVE=0
       shift
@@ -435,7 +425,7 @@ normalize_tui_setting() {
   }
 
   case "${USE_TUI,,}" in
-  portable | modern | gum)
+  portable)
     if portable_usable; then
       USE_TUI="portable"
     else
@@ -443,18 +433,8 @@ normalize_tui_setting() {
       exit 2
     fi
     ;;
-  whiptail | classic)
-    if command -v whiptail >/dev/null 2>&1; then
-      USE_TUI="whiptail"
-    else
-      echo "ERROR: BOOTSTRAP_TUI=whiptail requested but whiptail is not installed." >&2
-      exit 2
-    fi
-    ;;
   1 | true | yes | on)
-    if command -v whiptail >/dev/null 2>&1; then
-      USE_TUI="whiptail"
-    elif portable_usable; then
+    if portable_usable; then
       USE_TUI="portable"
     else
       USE_TUI="0"
@@ -464,9 +444,7 @@ normalize_tui_setting() {
     USE_TUI="0"
     ;;
   auto | "")
-    if command -v whiptail >/dev/null 2>&1; then
-      USE_TUI="whiptail"
-    elif portable_usable; then
+    if portable_usable; then
       USE_TUI="portable"
     else
       USE_TUI="0"
@@ -679,42 +657,6 @@ prompt() {
   printf '%s' "$reply"
 }
 
-whiptail_backtitle() {
-  local profile_label="${PROFILE_NAME:-none}"
-  printf 'Server Bootstrap v%s (%s) | Action: %s | Profile: %s | Run: %s' \
-    "$BOOTSTRAP_VERSION" "$BOOTSTRAP_GIT_HASH" "$ACTION" "$profile_label" "$RUN_ID"
-}
-
-show_whiptail_intro_once() {
-  [[ "$USE_TUI" == "whiptail" ]] || return 0
-  command -v whiptail >/dev/null 2>&1 || return 0
-  [[ "${WIZARD_INTRO_SHOWN:-0}" == "1" ]] && return 0
-
-  local intro_text
-  intro_text="$(
-    cat <<'EOF'
-Automated provisioning wizard for fresh servers.
-
-What this tool does:
-- lets you choose a profile with default values (dev/prod/custom)
-- lets you choose modules (ssh-keys, webmin, docker, wireguard)
-- executes module lifecycle plan -> apply -> verify
-
-Navigation:
-- Arrow keys: move in lists
-- Space: toggle modules in checklist
-- Tab: switch between buttons
-- Enter: confirm selection
-EOF
-  )"
-
-  whiptail \
-    --backtitle "$(whiptail_backtitle)" \
-    --title "Server Bootstrap Wizard" \
-    --msgbox "$intro_text" 19 90 || true
-  WIZARD_INTRO_SHOWN=1
-}
-
 portable_clear_screen() {
   printf '\033[2J\033[H' >/dev/tty
 }
@@ -835,38 +777,6 @@ choose_profile_interactive() {
       exit 0
     fi
     return 0
-  fi
-
-  if [[ "$USE_TUI" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1; then
-    show_whiptail_intro_once
-
-    local options=("none" "No profile")
-    local p
-    for p in "${profiles[@]}"; do
-      options+=("$p" "Profile ${p}")
-    done
-
-    local menu_text
-    menu_text="$(
-      cat <<'EOF'
-Select configuration profile.
-
-Profile values become defaults for module inputs.
-You can still override anything with CLI args or env vars.
-EOF
-    )"
-
-    local picked
-    if picked="$(whiptail \
-      --backtitle "$(whiptail_backtitle)" \
-      --title "Bootstrap Profile" \
-      --menu "$menu_text" 20 90 10 "${options[@]}" \
-      3>&1 1>&2 2>&3)"; then
-      if [[ "$picked" != "none" ]]; then
-        PROFILE_NAME="$picked"
-      fi
-      return 0
-    fi
   fi
 
   local answer
@@ -1010,43 +920,6 @@ choose_modules_portable() {
   done
 }
 
-choose_modules_whiptail() {
-  [[ "$USE_TUI" == "whiptail" ]] || return 1
-  command -v whiptail >/dev/null 2>&1 || return 1
-  show_whiptail_intro_once
-
-  local options=()
-  local id
-  for id in "${MODULE_IDS[@]}"; do
-    options+=("$id" "${MODULE_DESC_BY_ID[$id]}" "off")
-  done
-
-  local checklist_text
-  checklist_text="$(
-    cat <<EOF
-Select one or more modules to execute.
-
-Profile: ${PROFILE_NAME:-none}
-Action: ${ACTION}
-Available modules: ${#MODULE_IDS[@]}
-
-Tip: Space toggles modules, Tab switches buttons, Enter confirms.
-EOF
-  )"
-
-  local raw
-  raw="$(whiptail \
-    --backtitle "$(whiptail_backtitle)" \
-    --title "Module Selection" \
-    --checklist "$checklist_text" 24 100 14 "${options[@]}" \
-    3>&1 1>&2 2>&3)" || return 1
-  raw="${raw//\"/}"
-  [[ -n "$raw" ]] || return 1
-
-  read -r -a SELECTED_IDS <<<"$raw"
-  return 0
-}
-
 choose_modules_prompt() {
   local i choice confirm
 
@@ -1098,20 +971,8 @@ choose_modules_prompt() {
 }
 
 select_modules_interactive() {
-  if [[ "$USE_TUI" == "whiptail" ]]; then
-    if choose_modules_whiptail; then
-      return 0
-    fi
-    if choose_modules_portable; then
-      return 0
-    fi
-  else
-    if choose_modules_portable; then
-      return 0
-    fi
-    if choose_modules_whiptail; then
-      return 0
-    fi
+  if choose_modules_portable; then
+    return 0
   fi
   choose_modules_prompt
 }

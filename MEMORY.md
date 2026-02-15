@@ -41,14 +41,12 @@ Shellcheck note:
 
 ## TUI Strategy (Current)
 
-- `BOOTSTRAP_TUI=auto` (default) prefers `whiptail` for compatibility.
+- `BOOTSTRAP_TUI=auto` (default) uses portable Bash wizard on interactive terminals.
 - `BOOTSTRAP_TUI=portable` forces portable Bash wizard.
-- `BOOTSTRAP_TUI=whiptail` forces compatibility wizard.
 - `BOOTSTRAP_TUI=0` disables TUI and uses classic prompts.
-- CLI flags: `--tui-portable`, `--tui-whiptail` (`--tui-gum` is compatibility alias).
+- CLI flags: `--tui` and `--tui-portable`.
 
 Important expectation:
-- `whiptail` is intentionally retro (ncurses); improvements there are text/context only.
 - Portable mode runs without extra package installation on fresh servers.
 
 ## Remote Bootstrap Mechanics

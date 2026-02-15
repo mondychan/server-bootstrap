@@ -11,6 +11,8 @@ setup() {
   [[ "$output" == *"webmin"* ]]
   [[ "$output" == *"docker"* ]]
   [[ "$output" == *"wireguard"* ]]
+  [[ "$output" == *"unattended-upgrades"* ]]
+  [[ "$output" == *"time-sync"* ]]
 }
 
 @test "list modules json works" {
@@ -18,6 +20,8 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *'"id":"ssh-keys"'* ]]
   [[ "$output" == *'"id":"wireguard"'* ]]
+  [[ "$output" == *'"id":"unattended-upgrades"'* ]]
+  [[ "$output" == *'"id":"time-sync"'* ]]
 }
 
 @test "list profiles works" {

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.13] - 2026-02-15
+
+### Changed
+- Made portable Bash TUI the single supported interactive UI mode and removed whiptail mode/flags.
+- Added two new modules:
+  - `unattended-upgrades` for automatic APT security updates.
+  - `time-sync` for timezone + NTP configuration via `systemd-timesyncd`.
+- Set `time-sync` default timezone to `CET`.
+- Extended `dev` and `prod` profiles with `time-sync` NTP defaults.
+- Added inline explanatory comments for all profile variables in `profiles/dev.env` and `profiles/prod.env`.
+- Updated module docs/README and tests for newly added modules.
+
 ## [0.2.12] - 2026-02-15
 
 ### Fixed

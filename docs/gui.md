@@ -7,17 +7,15 @@ Portable TUI is available by default (no extra packages).
 
 `BOOTSTRAP_TUI` modes:
 
-- `auto` (default): use TUI when available, prefer `whiptail` for compatibility.
+- `auto` (default): use portable TUI when available.
 - `portable`: force portable Bash wizard.
-- `whiptail`: force compatibility wizard.
 - `1`: force TUI mode.
 - `0`: force classic prompt mode.
 
 Selection fallback order:
 
-1. `whiptail` (in `auto`)
-2. `portable`
-3. plain prompt
+1. `portable` (in `auto`)
+2. plain prompt
 
 Examples:
 
@@ -26,15 +24,11 @@ sudo ./main.sh
 sudo BOOTSTRAP_TUI=1 ./main.sh
 sudo BOOTSTRAP_TUI=portable ./main.sh
 sudo ./main.sh --tui-portable
-# compatibility alias:
-sudo ./main.sh --tui-gum
-sudo BOOTSTRAP_TUI=whiptail ./main.sh
-sudo ./main.sh --tui-whiptail
 sudo BOOTSTRAP_TUI=0 ./main.sh
 sudo ./main.sh --tui --plan
 ```
 
-Portable/whiptail wizard provides:
+Portable wizard provides:
 
 - profile picker
 - module browser with details

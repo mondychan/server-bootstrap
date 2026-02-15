@@ -79,6 +79,40 @@ Key env vars:
 Automation behavior:
 - CI/non-interactive runs should set `WG_CONFIRM=1`.
 
+### `unattended-upgrades`
+
+Purpose:
+- Enable automatic APT security upgrades for Debian/Ubuntu.
+
+Key env vars:
+- `UAU_AUTO_REBOOT` (`0` default, `1` to allow automatic reboot)
+- `UAU_AUTO_REBOOT_TIME` (`03:30` default, format `HH:MM`)
+- `UAU_REMOVE_UNUSED` (`1` default)
+- `UAU_UPDATE_PACKAGE_LISTS` (`1` default)
+- `UAU_UNATTENDED_UPGRADE` (`1` default)
+
+Behavior:
+- Installs `unattended-upgrades`.
+- Writes periodic config in `/etc/apt/apt.conf.d/20auto-upgrades`.
+- Writes bootstrap override in `/etc/apt/apt.conf.d/52bootstrap-unattended-upgrades`.
+
+### `time-sync`
+
+Purpose:
+- Set server timezone and configure NTP with `systemd-timesyncd`.
+
+Key env vars:
+- `TS_TIMEZONE` (`CET` default)
+- `TS_NTP_SERVERS` (optional, space/comma separated)
+- `TS_FALLBACK_NTP` (optional, space/comma separated)
+- `TS_STRICT_SYNC` (`0` default, `1` waits for synchronized state)
+- `TS_SYNC_TIMEOUT_SEC` (`60` default)
+
+Behavior:
+- Applies timezone via `timedatectl set-timezone`.
+- Enables NTP (`timedatectl set-ntp true`) and restarts `systemd-timesyncd`.
+- Writes drop-in config `/etc/systemd/timesyncd.conf.d/50-bootstrap.conf`.
+
 ## Writing new modules
 
 Minimal template:
