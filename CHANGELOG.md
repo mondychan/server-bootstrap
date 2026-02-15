@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.14] - 2026-02-15
+
+### Changed
+- Added colored console logs for clearer output readability (`ERROR`, `WARN`, `OK` highlighting).
+- Made colored console logs default behavior (`BOOTSTRAP_COLOR=always` by default).
+- Added `BOOTSTRAP_COLOR=auto|always|never` documentation in CLI/README.
+
 ## [0.2.13] - 2026-02-15
 
 ### Changed

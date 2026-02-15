@@ -126,6 +126,7 @@ The Web GUI calls the same `main.sh` actions (`plan/apply/verify`) underneath.
 - `BOOTSTRAP_VERBOSE=1` verbose logs
 - `BOOTSTRAP_INTERACTIVE=0` disable prompts
 - `BOOTSTRAP_TUI=auto|portable|1|0` pick auto/portable/disabled TUI mode
+- `BOOTSTRAP_COLOR=auto|always|never` default `always`; colorized console logs (`ERROR/WARN/OK`), plain file logs
 - `BOOTSTRAP_LOG_DIR=/path`
 - `BOOTSTRAP_STATE_DIR=/path`
 - `BOOTSTRAP_LOCK_FILE=/path`

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="0.2.13"
+BOOTSTRAP_VERSION="0.2.14"
 BOOTSTRAP_GIT_HASH="${BOOTSTRAP_GIT_HASH:-dev}"
 PINNED_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/tags/v${BOOTSTRAP_VERSION}.tar.gz"
 FALLBACK_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz"
@@ -55,6 +55,7 @@ source "${LIB_DIR}/common.sh"
 ACTION="apply"
 INTERACTIVE="${BOOTSTRAP_INTERACTIVE:-1}"
 USE_TUI="${BOOTSTRAP_TUI:-auto}"
+COLOR_MODE="${BOOTSTRAP_COLOR:-always}"
 LIST_ONLY=0
 LIST_JSON=0
 LIST_PROFILES=0
@@ -84,6 +85,12 @@ STATE_FILE=""
 LOCK_FILE=""
 LOCK_HELD=0
 LOCK_DIR=""
+COLOR_ENABLED=0
+C_RESET=""
+C_ERROR=""
+C_WARN=""
+C_OK=""
+C_VERBOSE=""
 
 trim() {
   local value="$1"
@@ -131,19 +138,78 @@ Env vars (global):
   BOOTSTRAP_INTERACTIVE=0    disable interactive selection
   BOOTSTRAP_TUI=auto|portable|1|0
                              auto prefers portable; portable forces concrete TUI
+  BOOTSTRAP_COLOR=auto|always|never
+                             default=always; file logs remain plain text
   BOOTSTRAP_LOG_DIR=<path>   override log directory
   BOOTSTRAP_STATE_DIR=<path> override state directory
   BOOTSTRAP_LOCK_FILE=<path> override lock file
 EOF
 }
 
+init_log_colors() {
+  case "${COLOR_MODE,,}" in
+  auto | "")
+    if [[ -t 1 ]] && [[ -n "${TERM:-}" ]] && [[ "${TERM}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
+      COLOR_ENABLED=1
+    fi
+    ;;
+  always | 1 | true | yes | on)
+    COLOR_ENABLED=1
+    ;;
+  never | 0 | false | no | off)
+    COLOR_ENABLED=0
+    ;;
+  *)
+    echo "ERROR: invalid BOOTSTRAP_COLOR value: ${COLOR_MODE}" >&2
+    exit 2
+    ;;
+  esac
+
+  if [[ "$COLOR_ENABLED" == "1" ]]; then
+    C_RESET=$'\033[0m'
+    C_ERROR=$'\033[1;31m'
+    C_WARN=$'\033[1;33m'
+    C_OK=$'\033[1;32m'
+    C_VERBOSE=$'\033[2m'
+  fi
+}
+
+colorize_console_line() {
+  local level="$1"
+  local line="$2"
+
+  if [[ "$COLOR_ENABLED" != "1" ]]; then
+    printf '%s' "$line"
+    return 0
+  fi
+
+  case "$level" in
+  ERROR)
+    printf '%s%s%s' "$C_ERROR" "$line" "$C_RESET"
+    ;;
+  WARN)
+    printf '%s%s%s' "$C_WARN" "$line" "$C_RESET"
+    ;;
+  OK)
+    printf '%s%s%s' "$C_OK" "$line" "$C_RESET"
+    ;;
+  VERBOSE)
+    printf '%s%s%s' "$C_VERBOSE" "$line" "$C_RESET"
+    ;;
+  *)
+    printf '%s' "$line"
+    ;;
+  esac
+}
+
 log_line() {
   local level="$1"
   local message="$2"
-  local ts line
+  local ts line console_line
   ts="$(sb_timestamp_utc)"
   line="[${ts}] [${level}] ${message}"
-  echo "$line"
+  console_line="$(colorize_console_line "$level" "$line")"
+  printf '%b\n' "$console_line"
   if [[ -n "${LOG_FILE}" ]]; then
     printf '%s\n' "$line" >>"${LOG_FILE}" || true
   fi
@@ -1100,10 +1166,25 @@ dedupe_ordered_ids() {
 log_module_output_line() {
   local module_id="$1"
   local line="$2"
-  local ts out
+  local ts out level console_line
   ts="$(sb_timestamp_utc)"
   out="[${ts}] [module:${module_id}] ${line}"
-  echo "$out"
+
+  level="INFO"
+  case "$line" in
+  ERROR:* | *" ERROR:"* | E:*)
+    level="ERROR"
+    ;;
+  WARN:* | *" WARN:"* | W:*)
+    level="WARN"
+    ;;
+  OK:* | *" OK:"*)
+    level="OK"
+    ;;
+  esac
+
+  console_line="$(colorize_console_line "$level" "$out")"
+  printf '%b\n' "$console_line"
   if [[ -n "${LOG_FILE}" ]]; then
     printf '%s\n' "$out" >>"${LOG_FILE}" || true
   fi
@@ -1249,6 +1330,7 @@ run_modules() {
 main() {
   parse_args "$@"
   normalize_tui_setting
+  init_log_colors
   index_modules
 
   if [[ "$LIST_ONLY" -eq 1 ]]; then
