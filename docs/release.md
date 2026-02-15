@@ -14,7 +14,7 @@ Checks:
 
 ```bash
 shellcheck main.sh lib/common.sh modules/*.sh gui/start.sh
-shfmt -d main.sh lib/common.sh modules/*.sh gui/start.sh
+shfmt -d -i 2 main.sh lib/common.sh modules/*.sh gui/start.sh
 bats tests
 ```
 
