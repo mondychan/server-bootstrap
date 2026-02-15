@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.15] - 2026-02-15
+
+### Fixed
+- Fixed module stage failure propagation in `main.sh` so non-zero module exits are no longer masked by output piping.
+- Hardened `webmin` module failure handling:
+  - cleanup of stale Webmin APT repository/key files before and after failed install attempts
+  - failed install now exits with error instead of printing false-positive success
+  - safe APT refresh after cleanup to prevent cross-module repo breakage
+
 ## [0.2.14] - 2026-02-15
 
 ### Changed

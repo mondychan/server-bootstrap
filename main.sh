@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="0.2.14"
+BOOTSTRAP_VERSION="0.2.15"
 BOOTSTRAP_GIT_HASH="${BOOTSTRAP_GIT_HASH:-dev}"
 PINNED_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/tags/v${BOOTSTRAP_VERSION}.tar.gz"
 FALLBACK_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz"
@@ -1199,12 +1199,13 @@ run_module_function() {
   log "${module_id}: ${stage}"
   emit_event "module-stage-start" "$module_id" "started" "$stage"
 
-  set +e
-  "$function_name" 2>&1 | while IFS= read -r line; do
+  if "$function_name" 2>&1 | while IFS= read -r line; do
     log_module_output_line "$module_id" "$line"
-  done
-  rc=${PIPESTATUS[0]}
-  set -e
+  done; then
+    rc=0
+  else
+    rc=${PIPESTATUS[0]}
+  fi
 
   if [[ "$rc" -ne 0 ]]; then
     emit_event "module-stage-end" "$module_id" "failed" "$stage rc=${rc}"

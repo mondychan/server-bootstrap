@@ -17,6 +17,24 @@ module_plan() {
   echo "Plan: install webmin version=${webmin_version}, port=${webmin_port}, strict_key_check=${strict_key}"
 }
 
+cleanup_webmin_repo_apt() {
+  rm -f /etc/apt/sources.list.d/webmin.list
+  rm -f /etc/apt/sources.list.d/webmin.list.save
+  rm -f /etc/apt/sources.list.d/webmin.repo
+  rm -f /etc/apt/sources.list.d/webmin.sources
+  rm -f /usr/share/keyrings/webmin.gpg
+
+  if [[ -d /etc/apt/sources.list.d ]]; then
+    find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0 |
+      xargs -0 -r grep -l 'download\.webmin\.com/download/repository' |
+      xargs -r rm -f || true
+  fi
+  if [[ -f /etc/apt/sources.list ]]; then
+    sed -i '/download\.webmin\.com\/download\/repository/d' /etc/apt/sources.list || true
+    sed -i '/download\.webmin\.com\/download\/newkey\/repository/d' /etc/apt/sources.list || true
+  fi
+}
+
 setup_webmin_repo_apt() {
   local key_url="https://download.webmin.com/jcameron-key.asc"
   local key_sha_expected="${WEBMIN_KEY_SHA256:-}"
@@ -28,19 +46,7 @@ setup_webmin_repo_apt() {
     return 1
   fi
 
-  rm -f /etc/apt/sources.list.d/webmin.list
-  rm -f /etc/apt/sources.list.d/webmin.list.save
-  rm -f /etc/apt/sources.list.d/webmin.repo
-
-  if [[ -d /etc/apt/sources.list.d ]]; then
-    find /etc/apt/sources.list.d -maxdepth 1 -type f -name '*.list' -print0 |
-      xargs -0 -r grep -l 'download\.webmin\.com/download/repository' |
-      xargs -r rm -f
-  fi
-  if [[ -f /etc/apt/sources.list ]]; then
-    sed -i '/download\.webmin\.com\/download\/repository/d' /etc/apt/sources.list
-    sed -i '/download\.webmin\.com\/download\/newkey\/repository/d' /etc/apt/sources.list
-  fi
+  cleanup_webmin_repo_apt
 
   install -d -m 0755 /usr/share/keyrings
   key_tmp="$(mktemp)"
@@ -94,6 +100,10 @@ module_apply() {
   if command -v apt-get >/dev/null 2>&1; then
     require_cmd apt-get curl gpg systemctl
 
+    echo "Cleaning stale Webmin APT repository entries (if any)"
+    cleanup_webmin_repo_apt
+    apt_mark_stale
+
     echo "Updating package lists"
     apt_update_once
     apt-get -y -qq install ca-certificates curl gnupg >/dev/null
@@ -103,12 +113,20 @@ module_apply() {
 
     echo "Installing Webmin"
     apt_mark_stale
-    apt_update_once
-
-    if [[ -n "$webmin_version" ]]; then
-      DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Progress-Fancy=1 install --install-recommends "webmin=${webmin_version}"
-    else
-      DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Progress-Fancy=1 install --install-recommends webmin
+    if ! {
+      apt_update_once
+      if [[ -n "$webmin_version" ]]; then
+        DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Progress-Fancy=1 install --install-recommends "webmin=${webmin_version}"
+      else
+        DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Progress-Fancy=1 install --install-recommends webmin
+      fi
+      systemctl enable --now webmin
+    }; then
+      echo "WARN: webmin install failed; cleaning Webmin APT repository configuration" >&2
+      cleanup_webmin_repo_apt
+      apt_mark_stale
+      apt_get_update_safe
+      return 1
     fi
   elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
     require_cmd rpm systemctl curl
@@ -129,12 +147,11 @@ EOF
     else
       yum install -y webmin
     fi
+    systemctl enable --now webmin
   else
     echo "ERROR: unsupported system (no apt-get/dnf/yum detected). ID=${os_id} ID_LIKE=${os_like}" >&2
     exit 1
   fi
-
-  systemctl enable --now webmin
 
   if [[ "${webmin_port}" != "10000" ]]; then
     if [[ -f /etc/webmin/miniserv.conf ]]; then
@@ -151,6 +168,12 @@ EOF
   fi
 
   echo "OK: webmin installed and configured"
+}
+
+apt_get_update_safe() {
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get -qq update >/dev/null 2>&1 || true
+  fi
 }
 
 module_verify() {
