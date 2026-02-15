@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.12] - 2026-02-15
+
+### Fixed
+- Fixed portable TUI crash caused by `status_line` being uninitialized under `set -u`.
+- Portable profile/module selection now proceeds correctly after profile confirmation.
+
 ## [0.2.11] - 2026-02-15
 
 ### Changed

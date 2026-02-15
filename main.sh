@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="0.2.11"
+BOOTSTRAP_VERSION="0.2.12"
 BOOTSTRAP_GIT_HASH="${BOOTSTRAP_GIT_HASH:-dev}"
 PINNED_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/tags/v${BOOTSTRAP_VERSION}.tar.gz"
 FALLBACK_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz"
@@ -949,7 +949,7 @@ choose_modules_portable() {
 
   local -a ids=("${MODULE_IDS[@]}")
   local -a marks=()
-  local i key status_line selected_count
+  local i key status_line="" selected_count=0
   local idx=0
   for i in "${!ids[@]}"; do
     marks+=("0")
