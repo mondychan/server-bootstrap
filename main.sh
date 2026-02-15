@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOOTSTRAP_VERSION="0.2.2"
+BOOTSTRAP_VERSION="0.2.4"
 BOOTSTRAP_GIT_HASH="${BOOTSTRAP_GIT_HASH:-dev}"
 PINNED_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/tags/v${BOOTSTRAP_VERSION}.tar.gz"
 FALLBACK_REPO_TARBALL_URL="https://github.com/mondychan/server-bootstrap/archive/refs/heads/main.tar.gz"
@@ -127,7 +127,7 @@ Env vars (global):
   BOOTSTRAP_DRY_RUN=1        skip apply stage, keep planning
   BOOTSTRAP_VERBOSE=1        verbose logs
   BOOTSTRAP_INTERACTIVE=0    disable interactive selection
-  BOOTSTRAP_TUI=auto|1|0     auto-detect modern TUI (gum/whiptail), force on/off
+  BOOTSTRAP_TUI=auto|1|0     auto-detect TUI (prefers whiptail), force on/off
   BOOTSTRAP_LOG_DIR=<path>   override log directory
   BOOTSTRAP_STATE_DIR=<path> override state directory
   BOOTSTRAP_LOCK_FILE=<path> override lock file
@@ -389,16 +389,31 @@ parse_args() {
 }
 
 normalize_tui_setting() {
+  gum_usable() {
+    command -v gum >/dev/null 2>&1 || return 1
+    [[ -t 1 ]] || return 1
+    [[ -n "${TERM:-}" && "${TERM}" != "dumb" ]] || return 1
+    return 0
+  }
+
   case "${USE_TUI,,}" in
     1|true|yes|on)
-      USE_TUI="1"
+      if command -v whiptail >/dev/null 2>&1; then
+        USE_TUI="whiptail"
+      elif gum_usable; then
+        USE_TUI="gum"
+      else
+        USE_TUI="0"
+      fi
       ;;
     0|false|no|off)
       USE_TUI="0"
       ;;
     auto|"")
-      if command -v gum >/dev/null 2>&1 || command -v whiptail >/dev/null 2>&1; then
-        USE_TUI="1"
+      if command -v whiptail >/dev/null 2>&1; then
+        USE_TUI="whiptail"
+      elif gum_usable; then
+        USE_TUI="gum"
       else
         USE_TUI="0"
       fi
@@ -613,7 +628,7 @@ choose_profile_interactive() {
   discover_profiles profiles
   [[ "${#profiles[@]}" -eq 0 ]] && return 0
 
-  if [[ "$USE_TUI" == "1" ]] && command -v gum >/dev/null 2>&1; then
+  if [[ "$USE_TUI" == "gum" ]] && command -v gum >/dev/null 2>&1; then
     local profile_lines=()
     local p picked selected_name
     profile_lines+=("none :: No profile (module defaults)")
@@ -621,8 +636,7 @@ choose_profile_interactive() {
       profile_lines+=("${p} :: Load profiles/${p}.env")
     done
 
-    picked="$(printf '%s\n' "${profile_lines[@]}" \
-      | gum choose --header "Select profile")" || {
+    picked="$(gum choose --header "Select profile" "${profile_lines[@]}")" || {
       echo "Aborted."
       exit 0
     }
@@ -633,7 +647,7 @@ choose_profile_interactive() {
     return 0
   fi
 
-  if [[ "$USE_TUI" == "1" ]] && command -v whiptail >/dev/null 2>&1; then
+  if [[ "$USE_TUI" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1; then
     local options=("none" "No profile")
     local p
     for p in "${profiles[@]}"; do
@@ -692,8 +706,7 @@ browse_modules_gum() {
 
   while true; do
     local picked
-    picked="$(printf '%s\n' "${lines[@]}" "back :: Return to selection" \
-      | gum choose --header "Browse modules")" || return 0
+    picked="$(gum choose --header "Browse modules" "${lines[@]}" "back :: Return to selection")" || return 0
     local selected_id="${picked%% :: *}"
     if [[ "$selected_id" == "back" ]]; then
       return 0
@@ -712,19 +725,18 @@ show_wizard_banner_gum() {
 }
 
 choose_modules_gum() {
-  [[ "$USE_TUI" == "1" ]] || return 1
+  [[ "$USE_TUI" == "gum" ]] || return 1
   command -v gum >/dev/null 2>&1 || return 1
 
   show_wizard_banner_gum
 
   local action
   while true; do
-    action="$(printf '%s\n' \
+    action="$(gum choose --header "What would you like to do?" \
       "Select modules" \
       "Browse module details" \
       "Select all modules" \
-      "Cancel" \
-      | gum choose --header "What would you like to do?")" || {
+      "Cancel")" || {
       echo "Aborted."
       exit 0
     }
@@ -749,8 +761,7 @@ choose_modules_gum() {
         done
 
         local selection
-        selection="$(printf '%s\n' "${lines[@]}" \
-          | gum choose --no-limit --height 15 --header "Select one or more modules")" || return 1
+        selection="$(gum choose --no-limit --height 15 --header "Select one or more modules" "${lines[@]}")" || return 1
         [[ -n "$selection" ]] || {
           gum style --foreground 214 "No module selected. Please select at least one."
           continue
@@ -773,7 +784,7 @@ choose_modules_gum() {
 }
 
 choose_modules_whiptail() {
-  [[ "$USE_TUI" == "1" ]] || return 1
+  [[ "$USE_TUI" == "whiptail" ]] || return 1
   command -v whiptail >/dev/null 2>&1 || return 1
 
   local options=()
@@ -842,11 +853,20 @@ choose_modules_prompt() {
 }
 
 select_modules_interactive() {
-  if choose_modules_gum; then
-    return 0
-  fi
-  if choose_modules_whiptail; then
-    return 0
+  if [[ "$USE_TUI" == "whiptail" ]]; then
+    if choose_modules_whiptail; then
+      return 0
+    fi
+    if choose_modules_gum; then
+      return 0
+    fi
+  else
+    if choose_modules_gum; then
+      return 0
+    fi
+    if choose_modules_whiptail; then
+      return 0
+    fi
   fi
   choose_modules_prompt
 }

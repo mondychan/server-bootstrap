@@ -74,6 +74,7 @@ sudo ./main.sh --profile prod --modules ssh-keys,docker
 ## TUI (Phase A)
 
 Modern TUI wizard is auto-enabled when `gum` or `whiptail` is available.
+In `auto` mode, compatibility-first selection prefers `whiptail` and falls back to `gum`.
 
 Use:
 
@@ -89,6 +90,12 @@ sudo ./main.sh
 sudo BOOTSTRAP_TUI=1 ./main.sh
 
 # force classic prompts
+sudo BOOTSTRAP_TUI=0 ./main.sh
+```
+
+If your terminal renders broken/garbled UI, use:
+
+```bash
 sudo BOOTSTRAP_TUI=0 ./main.sh
 ```
 

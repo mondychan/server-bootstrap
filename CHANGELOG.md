@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.4] - 2026-02-15
+
+### Changed
+- Fixed interactive TUI compatibility in problematic terminals by preferring `whiptail` in `auto` mode.
+- Stabilized `gum` menu invocation by passing choices as arguments instead of piped stdin.
+- Added explicit docs note and fallback for broken terminal rendering (`BOOTSTRAP_TUI=0`).
+
+## [0.2.3] - 2026-02-15
+
+### Changed
+- Improved TUI compatibility in interactive mode: `auto` now prefers `whiptail` before `gum`.
+- Hardened gum picker invocation by passing choices as arguments (instead of stdin pipes) to avoid broken key handling in some terminals.
+- Added clearer fallback behavior from advanced TUI to classic prompt mode when needed.
+- Updated docs with troubleshooting for garbled/broken terminal UI (`BOOTSTRAP_TUI=0`).
+
 ## [0.2.2] - 2026-02-15
 
 ### Changed
@@ -8,6 +23,7 @@
 - Reduced noisy download output in stdin bootstrap fallback path.
 - WireGuard interactive output ordering improved so public key prints cleanly around prompts.
 - Improved interactive CLI with modern gum wizard flow (profile picker, module detail browser, richer multi-select, clearer progress output).
+- Improved TUI compatibility: `auto` mode now prefers `whiptail`, with safer gum invocation and prompt fallback.
 
 ## [0.2.0] - 2026-02-15
 

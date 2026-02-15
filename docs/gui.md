@@ -6,7 +6,7 @@ Modern TUI is auto-detected by default.
 
 `BOOTSTRAP_TUI` modes:
 
-- `auto` (default): use TUI when available.
+- `auto` (default): use TUI when available, prefer `whiptail` for compatibility.
 - `1`: force TUI mode.
 - `0`: force classic prompt mode.
 
@@ -31,6 +31,12 @@ When `gum` is available, the wizard provides:
 - module browser with details
 - multi-select module chooser
 - explicit confirmation before execution
+
+If your terminal does not render gum correctly (garbled keys/colors), use:
+
+```bash
+sudo BOOTSTRAP_TUI=0 ./main.sh
+```
 
 ## Web GUI (Phase B)
 
