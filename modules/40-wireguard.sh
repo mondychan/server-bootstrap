@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-set -euo pipefail
 # shellcheck disable=SC2034
 # Module metadata variables are consumed dynamically by main.sh after sourcing this file.
+set -euo pipefail
 
 module_id="wireguard"
 module_desc="Configure WireGuard client to vpn.cocoit.cz"
