@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2] - 2026-02-15
+
+### Changed
+- Bumped pinned bootstrap version to `0.2.2` to align remote tarball resolution with latest release tag.
+- Improved interactive profile prompt handling (`none`/`default` is treated as no profile).
+- Reduced noisy download output in stdin bootstrap fallback path.
+- WireGuard interactive output ordering improved so public key prints cleanly around prompts.
+
 ## [0.2.0] - 2026-02-15
 
 ### Added
