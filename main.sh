@@ -920,9 +920,9 @@ Select one or more modules:
 EOF
 
   for i in "${!ids_ref[@]}"; do
-    id="${ids_ref[$i]}"
+    id="${ids_ref[i]}"
     mark="[ ]"
-    [[ "${marks_ref[$i]:-0}" == "1" ]] && mark="[x]"
+    [[ "${marks_ref[i]:-0}" == "1" ]] && mark="[x]"
     prefix="  "
     if ((i == current_index)); then
       prefix="> "
@@ -967,32 +967,32 @@ choose_modules_portable() {
       ((idx < ${#ids[@]} - 1)) && idx=$((idx + 1))
       ;;
     " ")
-      if [[ "${marks[$idx]}" == "1" ]]; then
-        marks[$idx]="0"
+      if [[ "${marks[idx]}" == "1" ]]; then
+        marks[idx]="0"
       else
-        marks[$idx]="1"
+        marks[idx]="1"
       fi
       ;;
     a | A)
       selected_count=0
       for i in "${!ids[@]}"; do
-        [[ "${marks[$i]}" == "1" ]] && selected_count=$((selected_count + 1))
+        [[ "${marks[i]}" == "1" ]] && selected_count=$((selected_count + 1))
       done
       if ((selected_count == ${#ids[@]})); then
         for i in "${!ids[@]}"; do
-          marks[$i]="0"
+          marks[i]="0"
         done
       else
         for i in "${!ids[@]}"; do
-          marks[$i]="1"
+          marks[i]="1"
         done
       fi
       ;;
     "" | $'\n' | $'\r')
       SELECTED_IDS=()
       for i in "${!ids[@]}"; do
-        if [[ "${marks[$i]}" == "1" ]]; then
-          SELECTED_IDS+=("${ids[$i]}")
+        if [[ "${marks[i]}" == "1" ]]; then
+          SELECTED_IDS+=("${ids[i]}")
         fi
       done
       if [[ "${#SELECTED_IDS[@]}" -eq 0 ]]; then
