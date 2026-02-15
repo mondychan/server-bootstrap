@@ -288,6 +288,7 @@ write_state() {
 
 acquire_lock() {
   local default_lock
+  local lock_parent
   if is_root; then
     default_lock="/var/lock/server-bootstrap.lock"
   else
@@ -295,7 +296,14 @@ acquire_lock() {
   fi
 
   LOCK_FILE="${BOOTSTRAP_LOCK_FILE:-$default_lock}"
-  install -d -m 0755 "$(dirname "$LOCK_FILE")"
+  lock_parent="$(dirname "$LOCK_FILE")"
+  if [[ ! -d "$lock_parent" ]]; then
+    install -d -m 0755 "$lock_parent"
+  fi
+  if [[ ! -w "$lock_parent" ]]; then
+    echo "ERROR: lock directory is not writable: $lock_parent" >&2
+    exit 1
+  fi
 
   if command -v flock >/dev/null 2>&1; then
     exec 9>"$LOCK_FILE"
