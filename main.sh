@@ -117,6 +117,8 @@ Options:
   --modules <csv>        comma-separated module IDs
   --profile <name>       load profiles/<name>.env
   --tui                  force TUI selector (gum/whiptail)
+  --tui-gum              force gum wizard (modern TUI)
+  --tui-whiptail         force whiptail wizard (max compatibility)
   --no-interactive       disable prompts and interactive selection
   --list                 list modules in text format
   --list-json            list modules as JSON
@@ -128,7 +130,8 @@ Env vars (global):
   BOOTSTRAP_DRY_RUN=1        skip apply stage, keep planning
   BOOTSTRAP_VERBOSE=1        verbose logs
   BOOTSTRAP_INTERACTIVE=0    disable interactive selection
-  BOOTSTRAP_TUI=auto|1|0     auto-detect TUI (prefers whiptail), force on/off
+  BOOTSTRAP_TUI=auto|gum|whiptail|1|0
+                             auto prefers whiptail; gum/whiptail force concrete UI
   BOOTSTRAP_LOG_DIR=<path>   override log directory
   BOOTSTRAP_STATE_DIR=<path> override state directory
   BOOTSTRAP_LOCK_FILE=<path> override lock file
@@ -387,6 +390,14 @@ parse_args() {
       USE_TUI=1
       shift
       ;;
+    --tui-gum)
+      USE_TUI="gum"
+      shift
+      ;;
+    --tui-whiptail)
+      USE_TUI="whiptail"
+      shift
+      ;;
     --no-interactive)
       INTERACTIVE=0
       shift
@@ -419,6 +430,24 @@ normalize_tui_setting() {
   }
 
   case "${USE_TUI,,}" in
+  gum | modern)
+    if gum_usable; then
+      USE_TUI="gum"
+    elif command -v gum >/dev/null 2>&1; then
+      USE_TUI="gum"
+    else
+      echo "ERROR: BOOTSTRAP_TUI=gum requested but gum is not installed." >&2
+      exit 2
+    fi
+    ;;
+  whiptail | classic)
+    if command -v whiptail >/dev/null 2>&1; then
+      USE_TUI="whiptail"
+    else
+      echo "ERROR: BOOTSTRAP_TUI=whiptail requested but whiptail is not installed." >&2
+      exit 2
+    fi
+    ;;
   1 | true | yes | on)
     if command -v whiptail >/dev/null 2>&1; then
       USE_TUI="whiptail"

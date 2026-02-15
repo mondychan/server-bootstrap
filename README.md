@@ -78,16 +78,25 @@ In `auto` mode, compatibility-first selection prefers `whiptail` and falls back 
 
 Use:
 
-- Uses `gum` when available
-- Falls back to `whiptail`
+- `auto`: prefers `whiptail` (compatibility-first)
+- `gum`: force modern wizard UI
+- `whiptail`: force compatibility wizard UI
 - Falls back to classic prompt UI
 
 ```bash
 # auto (default)
 sudo ./main.sh
 
-# force TUI on
+# force compatibility TUI (same behavior as auto in most terminals)
 sudo BOOTSTRAP_TUI=1 ./main.sh
+
+# force modern gum UI
+sudo BOOTSTRAP_TUI=gum ./main.sh
+sudo ./main.sh --tui-gum
+
+# force whiptail explicitly
+sudo BOOTSTRAP_TUI=whiptail ./main.sh
+sudo ./main.sh --tui-whiptail
 
 # force classic prompts
 sudo BOOTSTRAP_TUI=0 ./main.sh
@@ -101,7 +110,7 @@ sudo BOOTSTRAP_TUI=0 ./main.sh
 
 ## Web GUI (Phase B)
 
-Local ops panel (no external dependencies, Python stdlib only):
+Optional local ops panel (CLI is primary path for headless/remote environments):
 
 ```bash
 python3 gui/server.py --host 127.0.0.1 --port 8089
@@ -121,7 +130,7 @@ The Web GUI calls the same `main.sh` actions (`plan/apply/verify`) underneath.
 - `BOOTSTRAP_DRY_RUN=1` skip apply stage (plan still runs)
 - `BOOTSTRAP_VERBOSE=1` verbose logs
 - `BOOTSTRAP_INTERACTIVE=0` disable prompts
-- `BOOTSTRAP_TUI=auto|1|0` auto/force modern TUI off or on
+- `BOOTSTRAP_TUI=auto|gum|whiptail|1|0` pick auto/modern/compat/disabled TUI mode
 - `BOOTSTRAP_LOG_DIR=/path`
 - `BOOTSTRAP_STATE_DIR=/path`
 - `BOOTSTRAP_LOCK_FILE=/path`
@@ -159,6 +168,36 @@ CI workflow runs:
 - `shellcheck`
 - `shfmt`
 - `bats` tests
+
+## Release Version Sync (Mandatory)
+
+When releasing a new version, keep these values synchronized:
+
+1. `main.sh` -> `BOOTSTRAP_VERSION="<new_version>"`
+2. `VERSION` -> `<new_version>`
+3. `CHANGELOG.md` -> add section `[<new_version>]` with date and changes
+4. Git tag -> `v<new_version>` (annotated tag)
+
+Why this is mandatory:
+- short bootstrap (`https://bootstrap.cocoit.cz`) downloads a pinned tarball from `main.sh` using `BOOTSTRAP_VERSION`
+- if `BOOTSTRAP_VERSION` is not bumped, users get an older release even when `main` has newer code
+
+Recommended release commands:
+
+```bash
+# example for 0.2.6
+git add main.sh VERSION CHANGELOG.md
+git commit -m "release: v0.2.6"
+git push origin main
+git tag -a v0.2.6 -m "Release v0.2.6"
+git push origin v0.2.6
+```
+
+Verification:
+
+```bash
+git ls-remote origin refs/heads/main refs/tags/v0.2.6 refs/tags/v0.2.6^{}
+```
 
 ## Documentation
 
