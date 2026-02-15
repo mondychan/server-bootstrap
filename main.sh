@@ -61,6 +61,7 @@ LIST_PROFILES=0
 LIST_PROFILES_JSON=0
 PROFILE_NAME=""
 MODULES_CSV=""
+WIZARD_INTRO_SHOWN=0
 
 declare -a POSITIONAL_IDS=()
 declare -a MODULE_PATHS=()
@@ -646,6 +647,42 @@ prompt() {
   printf '%s' "$reply"
 }
 
+whiptail_backtitle() {
+  local profile_label="${PROFILE_NAME:-none}"
+  printf 'Server Bootstrap v%s (%s) | Action: %s | Profile: %s | Run: %s' \
+    "$BOOTSTRAP_VERSION" "$BOOTSTRAP_GIT_HASH" "$ACTION" "$profile_label" "$RUN_ID"
+}
+
+show_whiptail_intro_once() {
+  [[ "$USE_TUI" == "whiptail" ]] || return 0
+  command -v whiptail >/dev/null 2>&1 || return 0
+  [[ "${WIZARD_INTRO_SHOWN:-0}" == "1" ]] && return 0
+
+  local intro_text
+  intro_text="$(
+    cat <<'EOF'
+Automated provisioning wizard for fresh servers.
+
+What this tool does:
+- lets you choose a profile with default values (dev/prod/custom)
+- lets you choose modules (ssh-keys, webmin, docker, wireguard)
+- executes module lifecycle plan -> apply -> verify
+
+Navigation:
+- Arrow keys: move in lists
+- Space: toggle modules in checklist
+- Tab: switch between buttons
+- Enter: confirm selection
+EOF
+  )"
+
+  whiptail \
+    --backtitle "$(whiptail_backtitle)" \
+    --title "Server Bootstrap Wizard" \
+    --msgbox "$intro_text" 19 90 || true
+  WIZARD_INTRO_SHOWN=1
+}
+
 choose_profile_interactive() {
   [[ -n "$PROFILE_NAME" ]] && return 0
 
@@ -673,14 +710,30 @@ choose_profile_interactive() {
   fi
 
   if [[ "$USE_TUI" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1; then
+    show_whiptail_intro_once
+
     local options=("none" "No profile")
     local p
     for p in "${profiles[@]}"; do
       options+=("$p" "Profile ${p}")
     done
 
+    local menu_text
+    menu_text="$(
+      cat <<'EOF'
+Select configuration profile.
+
+Profile values become defaults for module inputs.
+You can still override anything with CLI args or env vars.
+EOF
+    )"
+
     local picked
-    if picked="$(whiptail --title "Bootstrap profile" --menu "Select profile" 20 70 10 "${options[@]}" 3>&1 1>&2 2>&3)"; then
+    if picked="$(whiptail \
+      --backtitle "$(whiptail_backtitle)" \
+      --title "Bootstrap Profile" \
+      --menu "$menu_text" 20 90 10 "${options[@]}" \
+      3>&1 1>&2 2>&3)"; then
       if [[ "$picked" != "none" ]]; then
         PROFILE_NAME="$picked"
       fi
@@ -811,6 +864,7 @@ choose_modules_gum() {
 choose_modules_whiptail() {
   [[ "$USE_TUI" == "whiptail" ]] || return 1
   command -v whiptail >/dev/null 2>&1 || return 1
+  show_whiptail_intro_once
 
   local options=()
   local id
@@ -818,8 +872,25 @@ choose_modules_whiptail() {
     options+=("$id" "${MODULE_DESC_BY_ID[$id]}" "off")
   done
 
+  local checklist_text
+  checklist_text="$(
+    cat <<EOF
+Select one or more modules to execute.
+
+Profile: ${PROFILE_NAME:-none}
+Action: ${ACTION}
+Available modules: ${#MODULE_IDS[@]}
+
+Tip: Space toggles modules, Tab switches buttons, Enter confirms.
+EOF
+  )"
+
   local raw
-  raw="$(whiptail --title "Server Bootstrap" --checklist "Select modules" 22 90 14 "${options[@]}" 3>&1 1>&2 2>&3)" || return 1
+  raw="$(whiptail \
+    --backtitle "$(whiptail_backtitle)" \
+    --title "Module Selection" \
+    --checklist "$checklist_text" 24 100 14 "${options[@]}" \
+    3>&1 1>&2 2>&3)" || return 1
   raw="${raw//\"/}"
   [[ -n "$raw" ]] || return 1
 
