@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.11] - 2026-02-15
+
+### Changed
+- Replaced optional `gum` runtime dependency with a portable Bash TUI mode.
+- Added portable interactive navigation (`arrows`, `space`, `enter`) for profile and module selection.
+- Added explicit `BOOTSTRAP_TUI=portable` and `--tui-portable` mode.
+- Kept `--tui-gum` as a compatibility alias mapped to portable mode.
+- Updated CLI/TUI docs and project memory for dependency-free first-run UX.
+- Fixed shellcheck issues in portable TUI array indexing and kept CI green.
+- Synchronized release version points for short bootstrap pinning consistency.
+
 ## [0.2.8] - 2026-02-15
 
 ### Changed
