@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.8] - 2026-02-15
+
+### Changed
+- Added explicit TUI selection modes for CLI-first operation:
+  - `BOOTSTRAP_TUI=gum` / `--tui-gum` for modern wizard
+  - `BOOTSTRAP_TUI=whiptail` / `--tui-whiptail` for compatibility mode
+- Updated documentation to emphasize CLI/TUI-first usage for headless and remote environments.
+- Added and expanded `MEMORY.md` to preserve architecture, release process, and troubleshooting context for future development continuity.
+- Synchronized release version points (`main.sh`, `VERSION`, changelog) to keep short bootstrap pinned tag behavior correct.
+
 ## [0.2.6] - 2026-02-15
 
 ### Changed
