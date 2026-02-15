@@ -253,7 +253,7 @@ write_state() {
     printf '  "git_hash": "%s",\n' "$(json_escape "$BOOTSTRAP_GIT_HASH")"
     printf '  "action": "%s",\n' "$(json_escape "$ACTION")"
     printf '  "profile": "%s",\n' "$(json_escape "$file_profile")"
-    printf '  "dry_run": %s,\n' "$( [[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]] && echo true || echo false )"
+    printf '  "dry_run": %s,\n' "$([[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]] && echo true || echo false)"
     printf '  "modules": [\n'
 
     local idx id status details
@@ -265,7 +265,7 @@ write_state() {
         "$(json_escape "$id")" \
         "$(json_escape "$status")" \
         "$(json_escape "$details")"
-      if (( idx < ${#ORDERED_IDS[@]} - 1 )); then
+      if ((idx < ${#ORDERED_IDS[@]} - 1)); then
         printf ','
       fi
       printf '\n'
@@ -319,71 +319,77 @@ require_root() {
 parse_args() {
   while [[ "$#" -gt 0 ]]; do
     case "$1" in
-      --help|-h)
-        usage
-        exit 0
-        ;;
-      --list)
-        LIST_ONLY=1
-        shift
-        ;;
-      --list-json)
-        LIST_JSON=1
-        shift
-        ;;
-      --list-profiles)
-        LIST_PROFILES=1
-        shift
-        ;;
-      --list-profiles-json)
-        LIST_PROFILES_JSON=1
-        shift
-        ;;
-      --apply)
-        ACTION="apply"
-        shift
-        ;;
-      --plan)
-        ACTION="plan"
-        shift
-        ;;
-      --verify)
-        ACTION="verify"
-        shift
-        ;;
-      --modules)
-        [[ $# -ge 2 ]] || { echo "ERROR: --modules requires a value" >&2; exit 2; }
-        MODULES_CSV="$2"
-        shift 2
-        ;;
-      --profile)
-        [[ $# -ge 2 ]] || { echo "ERROR: --profile requires a value" >&2; exit 2; }
-        PROFILE_NAME="$2"
-        shift 2
-        ;;
-      --tui)
-        USE_TUI=1
-        shift
-        ;;
-      --no-interactive)
-        INTERACTIVE=0
-        shift
-        ;;
-      --)
-        shift
-        while [[ "$#" -gt 0 ]]; do
-          POSITIONAL_IDS+=("$1")
-          shift
-        done
-        ;;
-      -* )
-        echo "ERROR: unknown option: $1" >&2
+    --help | -h)
+      usage
+      exit 0
+      ;;
+    --list)
+      LIST_ONLY=1
+      shift
+      ;;
+    --list-json)
+      LIST_JSON=1
+      shift
+      ;;
+    --list-profiles)
+      LIST_PROFILES=1
+      shift
+      ;;
+    --list-profiles-json)
+      LIST_PROFILES_JSON=1
+      shift
+      ;;
+    --apply)
+      ACTION="apply"
+      shift
+      ;;
+    --plan)
+      ACTION="plan"
+      shift
+      ;;
+    --verify)
+      ACTION="verify"
+      shift
+      ;;
+    --modules)
+      [[ $# -ge 2 ]] || {
+        echo "ERROR: --modules requires a value" >&2
         exit 2
-        ;;
-      *)
+      }
+      MODULES_CSV="$2"
+      shift 2
+      ;;
+    --profile)
+      [[ $# -ge 2 ]] || {
+        echo "ERROR: --profile requires a value" >&2
+        exit 2
+      }
+      PROFILE_NAME="$2"
+      shift 2
+      ;;
+    --tui)
+      USE_TUI=1
+      shift
+      ;;
+    --no-interactive)
+      INTERACTIVE=0
+      shift
+      ;;
+    --)
+      shift
+      while [[ "$#" -gt 0 ]]; do
         POSITIONAL_IDS+=("$1")
         shift
-        ;;
+      done
+      ;;
+    -*)
+      echo "ERROR: unknown option: $1" >&2
+      exit 2
+      ;;
+    *)
+      POSITIONAL_IDS+=("$1")
+      shift
+      ;;
     esac
   done
 }
@@ -397,31 +403,31 @@ normalize_tui_setting() {
   }
 
   case "${USE_TUI,,}" in
-    1|true|yes|on)
-      if command -v whiptail >/dev/null 2>&1; then
-        USE_TUI="whiptail"
-      elif gum_usable; then
-        USE_TUI="gum"
-      else
-        USE_TUI="0"
-      fi
-      ;;
-    0|false|no|off)
+  1 | true | yes | on)
+    if command -v whiptail >/dev/null 2>&1; then
+      USE_TUI="whiptail"
+    elif gum_usable; then
+      USE_TUI="gum"
+    else
       USE_TUI="0"
-      ;;
-    auto|"")
-      if command -v whiptail >/dev/null 2>&1; then
-        USE_TUI="whiptail"
-      elif gum_usable; then
-        USE_TUI="gum"
-      else
-        USE_TUI="0"
-      fi
-      ;;
-    *)
-      echo "ERROR: invalid BOOTSTRAP_TUI value: ${USE_TUI}" >&2
-      exit 2
-      ;;
+    fi
+    ;;
+  0 | false | no | off)
+    USE_TUI="0"
+    ;;
+  auto | "")
+    if command -v whiptail >/dev/null 2>&1; then
+      USE_TUI="whiptail"
+    elif gum_usable; then
+      USE_TUI="gum"
+    else
+      USE_TUI="0"
+    fi
+    ;;
+  *)
+    echo "ERROR: invalid BOOTSTRAP_TUI value: ${USE_TUI}" >&2
+    exit 2
+    ;;
   esac
 }
 
@@ -614,7 +620,7 @@ prompt() {
   if [[ -t 0 ]]; then
     read -r -p "$message" reply
   elif [[ -r /dev/tty ]]; then
-    read -r -p "$message" reply < /dev/tty
+    read -r -p "$message" reply </dev/tty
   else
     return 1
   fi
@@ -667,10 +673,10 @@ choose_profile_interactive() {
   answer="$(prompt "Profile (empty=none, options: ${profiles[*]}): " || true)"
   answer="$(trim "$answer")"
   case "${answer,,}" in
-    ""|none|no|n|default)
-      PROFILE_NAME=""
-      return 0
-      ;;
+  "" | none | no | n | default)
+    PROFILE_NAME=""
+    return 0
+    ;;
   esac
   if [[ -n "$answer" ]]; then
     PROFILE_NAME="$answer"
@@ -742,43 +748,43 @@ choose_modules_gum() {
     }
 
     case "$action" in
-      "Browse module details")
-        browse_modules_gum
-        ;;
-      "Select all modules")
-        SELECTED_IDS=("${MODULE_IDS[@]}")
+    "Browse module details")
+      browse_modules_gum
+      ;;
+    "Select all modules")
+      SELECTED_IDS=("${MODULE_IDS[@]}")
+      return 0
+      ;;
+    "Cancel")
+      echo "Aborted."
+      exit 0
+      ;;
+    "Select modules")
+      local lines=()
+      local id
+      for id in "${MODULE_IDS[@]}"; do
+        lines+=("${id} :: ${MODULE_DESC_BY_ID[$id]}")
+      done
+
+      local selection
+      selection="$(gum choose --no-limit --height 15 --header "Select one or more modules" "${lines[@]}")" || return 1
+      [[ -n "$selection" ]] || {
+        gum style --foreground 214 "No module selected. Please select at least one."
+        continue
+      }
+
+      SELECTED_IDS=()
+      local line
+      while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        SELECTED_IDS+=("${line%% :: *}")
+      done <<<"$selection"
+
+      gum style --foreground 244 "Selected: ${SELECTED_IDS[*]}"
+      if gum confirm "Proceed with selected modules?"; then
         return 0
-        ;;
-      "Cancel")
-        echo "Aborted."
-        exit 0
-        ;;
-      "Select modules")
-        local lines=()
-        local id
-        for id in "${MODULE_IDS[@]}"; do
-          lines+=("${id} :: ${MODULE_DESC_BY_ID[$id]}")
-        done
-
-        local selection
-        selection="$(gum choose --no-limit --height 15 --header "Select one or more modules" "${lines[@]}")" || return 1
-        [[ -n "$selection" ]] || {
-          gum style --foreground 214 "No module selected. Please select at least one."
-          continue
-        }
-
-        SELECTED_IDS=()
-        local line
-        while IFS= read -r line; do
-          [[ -n "$line" ]] || continue
-          SELECTED_IDS+=("${line%% :: *}")
-        done <<<"$selection"
-
-        gum style --foreground 244 "Selected: ${SELECTED_IDS[*]}"
-        if gum confirm "Proceed with selected modules?"; then
-          return 0
-        fi
-        ;;
+      fi
+      ;;
     esac
   done
 }
@@ -829,7 +835,7 @@ choose_modules_prompt() {
       [[ -n "$token" ]] || continue
       if [[ "$token" =~ ^[0-9]+$ ]]; then
         idx=$((token - 1))
-        if (( idx >= 0 && idx < ${#MODULE_IDS[@]} )); then
+        if ((idx >= 0 && idx < ${#MODULE_IDS[@]})); then
           SELECTED_IDS+=("${MODULE_IDS[$idx]}")
         else
           echo "ERROR: invalid selection index: $token" >&2
@@ -941,13 +947,13 @@ visit_module_dep() {
   local id="$1"
 
   case "${_visit_state[$id]:-0}" in
-    1)
-      echo "ERROR: dependency cycle detected near module '$id'" >&2
-      exit 2
-      ;;
-    2)
-      return 0
-      ;;
+  1)
+    echo "ERROR: dependency cycle detected near module '$id'" >&2
+    exit 2
+    ;;
+  2)
+    return 0
+    ;;
   esac
 
   _visit_state["$id"]=1
@@ -1042,67 +1048,67 @@ run_one_module() {
   fi
 
   case "$ACTION" in
-    plan)
-      RUN_STATUS_BY_ID["$module_id"]="planned"
-      RUN_DETAILS_BY_ID["$module_id"]="plan complete"
+  plan)
+    RUN_STATUS_BY_ID["$module_id"]="planned"
+    RUN_DETAILS_BY_ID["$module_id"]="plan complete"
+    return 0
+    ;;
+  apply)
+    if [[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]]; then
+      log "${module_id}: dry-run skip apply/verify"
+      RUN_STATUS_BY_ID["$module_id"]="dry-run"
+      RUN_DETAILS_BY_ID["$module_id"]="apply skipped"
+      emit_event "module-dry-run" "$module_id" "skipped" "apply stage skipped"
       return 0
-      ;;
-    apply)
-      if [[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]]; then
-        log "${module_id}: dry-run skip apply/verify"
-        RUN_STATUS_BY_ID["$module_id"]="dry-run"
-        RUN_DETAILS_BY_ID["$module_id"]="apply skipped"
-        emit_event "module-dry-run" "$module_id" "skipped" "apply stage skipped"
-        return 0
-      fi
+    fi
 
-      if ! run_module_function "$module_id" "apply" module_apply; then
-        RUN_STATUS_BY_ID["$module_id"]="failed"
-        RUN_DETAILS_BY_ID["$module_id"]="apply failed"
-        return 1
-      fi
+    if ! run_module_function "$module_id" "apply" module_apply; then
+      RUN_STATUS_BY_ID["$module_id"]="failed"
+      RUN_DETAILS_BY_ID["$module_id"]="apply failed"
+      return 1
+    fi
 
-      if ! run_module_function "$module_id" "verify" module_verify; then
-        RUN_STATUS_BY_ID["$module_id"]="failed"
-        RUN_DETAILS_BY_ID["$module_id"]="verify failed"
-        return 1
-      fi
+    if ! run_module_function "$module_id" "verify" module_verify; then
+      RUN_STATUS_BY_ID["$module_id"]="failed"
+      RUN_DETAILS_BY_ID["$module_id"]="verify failed"
+      return 1
+    fi
 
-      RUN_STATUS_BY_ID["$module_id"]="ok"
-      RUN_DETAILS_BY_ID["$module_id"]="apply+verify complete"
-      return 0
-      ;;
-    verify)
-      if ! run_module_function "$module_id" "verify" module_verify; then
-        RUN_STATUS_BY_ID["$module_id"]="failed"
-        RUN_DETAILS_BY_ID["$module_id"]="verify failed"
-        return 1
-      fi
-      RUN_STATUS_BY_ID["$module_id"]="ok"
-      RUN_DETAILS_BY_ID["$module_id"]="verify complete"
-      return 0
-      ;;
-    *)
-      echo "ERROR: unsupported action: $ACTION" >&2
-      return 2
-      ;;
+    RUN_STATUS_BY_ID["$module_id"]="ok"
+    RUN_DETAILS_BY_ID["$module_id"]="apply+verify complete"
+    return 0
+    ;;
+  verify)
+    if ! run_module_function "$module_id" "verify" module_verify; then
+      RUN_STATUS_BY_ID["$module_id"]="failed"
+      RUN_DETAILS_BY_ID["$module_id"]="verify failed"
+      return 1
+    fi
+    RUN_STATUS_BY_ID["$module_id"]="ok"
+    RUN_DETAILS_BY_ID["$module_id"]="verify complete"
+    return 0
+    ;;
+  *)
+    echo "ERROR: unsupported action: $ACTION" >&2
+    return 2
+    ;;
   esac
 }
 
 should_require_root() {
   case "$ACTION" in
-    plan)
+  plan)
+    return 1
+    ;;
+  verify)
+    return 0
+    ;;
+  apply)
+    if [[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]]; then
       return 1
-      ;;
-    verify)
-      return 0
-      ;;
-    apply)
-      if [[ "${BOOTSTRAP_DRY_RUN:-0}" == "1" ]]; then
-        return 1
-      fi
-      return 0
-      ;;
+    fi
+    return 0
+    ;;
   esac
   return 1
 }
@@ -1131,7 +1137,7 @@ run_modules() {
     fi
   done
 
-  if (( failures > 0 )); then
+  if ((failures > 0)); then
     emit_event "run-end" "" "failed" "failures=${failures}"
     return 1
   fi
