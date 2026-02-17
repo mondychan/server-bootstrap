@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.17] - 2026-02-15
+
+### Changed
+- Expanded WireGuard profile-driven configuration:
+  - added endpoint host/port override support (`WG_ENDPOINT_HOST`, `WG_ENDPOINT_PORT`)
+  - added peer and tunnel options (`WG_PEER_PUBLIC_KEY`, `WG_ALLOWED_IPS`, `WG_PERSISTENT_KEEPALIVE`, `WG_DNS`)
+- Clarified WireGuard `WG_ADDRESS` wording as local interface address of this peer.
+- Updated profile examples (`dev`, `prod`, `forte`) with extended WireGuard settings.
+- Restructured `README.md` for clearer onboarding flow, one-liner usage, command structure, and release guidance.
+
 ## [0.2.16] - 2026-02-15
 
 ### Changed
