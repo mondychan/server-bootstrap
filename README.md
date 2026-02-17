@@ -153,7 +153,7 @@ bash gui/start.sh
 | `ssh-keys` | Sync `authorized_keys` from GitHub via systemd timer + SSH hardening. | `GH_USER`, `USERNAME`, `INTERVAL_MIN`, `SSH_REQUIRE_SERVER`, `SSH_AUTO_INSTALL` |
 | `webmin` | Install Webmin from official repository, verify service. | `WEBMIN_PORT`, `WEBMIN_VERSION`, `WEBMIN_KEY_SHA256`, `WEBMIN_STRICT_KEY_CHECK` |
 | `docker` | Install Docker Engine + Compose plugin from official repo. | `DOCKER_HELLO` |
-| `wireguard` | WireGuard client setup to configurable endpoint. | `WG_ADDRESS`, `WG_INTERFACE`, `WG_CONFIRM`, `WG_TEST`, `WG_ENDPOINT_HOST`, `WG_ENDPOINT_PORT`, `WG_PEER_PUBLIC_KEY`, `WG_ALLOWED_IPS`, `WG_PERSISTENT_KEEPALIVE`, `WG_DNS` |
+| `wireguard` | WireGuard client setup to configurable endpoint. | `WG_ADDRESS`, `WG_INTERFACE`, `WG_CONFIRM`, `WG_TEST`, `WG_BACKEND`, `WG_ENDPOINT_HOST`, `WG_ENDPOINT_PORT`, `WG_PEER_PUBLIC_KEY`, `WG_ALLOWED_IPS`, `WG_PERSISTENT_KEEPALIVE`, `WG_DNS` |
 | `unattended-upgrades` | Enable automatic security updates via APT unattended-upgrades. | `UAU_AUTO_REBOOT`, `UAU_AUTO_REBOOT_TIME`, `UAU_REMOVE_UNUSED`, `UAU_UPDATE_PACKAGE_LISTS`, `UAU_UNATTENDED_UPGRADE` |
 | `time-sync` | Configure timezone and NTP sync via systemd-timesyncd. | `TS_TIMEZONE`, `TS_NTP_SERVERS`, `TS_FALLBACK_NTP`, `TS_STRICT_SYNC`, `TS_SYNC_TIMEOUT_SEC` |
 

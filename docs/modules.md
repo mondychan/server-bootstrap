@@ -77,6 +77,7 @@ Key env vars:
 - `WG_ADDRESS` (local WireGuard interface address for this peer; required unless interactive prompt)
 - `WG_CONFIRM` (`0` default, `1` for non-interactive approval)
 - `WG_TEST` (`ask`, `0`, `1`)
+- `WG_BACKEND` (`auto` default; `auto|kernel|userspace`)
 - `WG_ENDPOINT_HOST` (default `vpn.cocoit.cz`)
 - `WG_ENDPOINT_PORT` (default `13231`)
 - `WG_PEER_PUBLIC_KEY` (default bundled peer key)
@@ -86,6 +87,8 @@ Key env vars:
 
 Automation behavior:
 - CI/non-interactive runs should set `WG_CONFIRM=1`.
+- When `WG_BACKEND=auto` and kernel WireGuard is unavailable, module installs `wireguard-go`
+  and writes systemd drop-in for `wg-quick@<iface>` so userspace backend starts automatically.
 
 ### `unattended-upgrades`
 

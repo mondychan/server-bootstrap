@@ -5,7 +5,7 @@ set -euo pipefail
 
 module_id="wireguard"
 module_desc="Configure WireGuard client endpoint"
-module_env="WG_INTERFACE, WG_ADDRESS, WG_CONFIRM, WG_TEST, WG_ENDPOINT_HOST, WG_ENDPOINT_PORT, WG_PEER_PUBLIC_KEY, WG_ALLOWED_IPS, WG_PERSISTENT_KEEPALIVE, WG_DNS"
+module_env="WG_INTERFACE, WG_ADDRESS, WG_CONFIRM, WG_TEST, WG_BACKEND, WG_ENDPOINT_HOST, WG_ENDPOINT_PORT, WG_PEER_PUBLIC_KEY, WG_ALLOWED_IPS, WG_PERSISTENT_KEEPALIVE, WG_DNS"
 module_deps=()
 
 prompt_wireguard() {
@@ -85,11 +85,45 @@ validate_wg_dns_list() {
   return 0
 }
 
+wireguard_kernel_supported() {
+  local probe_iface="wgsb${RANDOM}"
+  if ip link add "$probe_iface" type wireguard >/dev/null 2>&1; then
+    ip link del "$probe_iface" >/dev/null 2>&1 || true
+    return 0
+  fi
+  return 1
+}
+
+configure_wg_quick_backend() {
+  local wg_iface="$1"
+  local backend="$2"
+  local dropin_dir="/etc/systemd/system/wg-quick@${wg_iface}.service.d"
+  local dropin_file="${dropin_dir}/10-bootstrap-backend.conf"
+
+  if [[ "$backend" == "userspace" ]]; then
+    install -d -m 0755 "$dropin_dir"
+    cat <<EOF | safe_write_file "$dropin_file" 0644 root root
+[Service]
+Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=wireguard-go
+EOF
+    systemctl daemon-reload
+    echo "Configured wg-quick@${wg_iface} to use userspace backend (wireguard-go)"
+    return 0
+  fi
+
+  if [[ -f "$dropin_file" ]]; then
+    rm -f "$dropin_file"
+    systemctl daemon-reload
+    echo "Configured wg-quick@${wg_iface} to use kernel backend"
+  fi
+}
+
 module_plan() {
   local wg_iface="${WG_INTERFACE:-wg0}"
   local wg_address="${WG_ADDRESS:-<prompt>}"
   local wg_confirm="${WG_CONFIRM:-0}"
   local wg_test="${WG_TEST:-ask}"
+  local wg_backend="${WG_BACKEND:-auto}"
   local endpoint_host="${WG_ENDPOINT_HOST:-vpn.cocoit.cz}"
   local endpoint_port="${WG_ENDPOINT_PORT:-13231}"
   local allowed_ips="${WG_ALLOWED_IPS:-192.168.70.0/24}"
@@ -97,7 +131,7 @@ module_plan() {
   local dns="${WG_DNS:-<none>}"
 
   echo "Plan: install WireGuard package and configure ${wg_iface}"
-  echo "Plan: address=${wg_address}, endpoint=${endpoint_host}:${endpoint_port}, auto-confirm=${wg_confirm}, test=${wg_test}"
+  echo "Plan: address=${wg_address}, endpoint=${endpoint_host}:${endpoint_port}, backend=${wg_backend}, auto-confirm=${wg_confirm}, test=${wg_test}"
   echo "Plan: allowed_ips=${allowed_ips}, keepalive=${keepalive}, dns=${dns}"
 }
 
@@ -106,6 +140,8 @@ module_apply() {
   local wg_address="${WG_ADDRESS:-}"
   local wg_confirm="${WG_CONFIRM:-0}"
   local wg_test="${WG_TEST:-ask}"
+  local wg_backend="${WG_BACKEND:-auto}"
+  local selected_backend="kernel"
 
   local endpoint_host="${WG_ENDPOINT_HOST:-vpn.cocoit.cz}"
   local endpoint_port="${WG_ENDPOINT_PORT:-13231}"
@@ -161,8 +197,15 @@ module_apply() {
     exit 1
     ;;
   esac
+  case "$wg_backend" in
+  auto | kernel | userspace) ;;
+  *)
+    echo "ERROR: invalid WG_BACKEND='$wg_backend' (expected auto, kernel, or userspace)" >&2
+    exit 1
+    ;;
+  esac
 
-  require_cmd apt-get systemctl
+  require_cmd apt-get systemctl ip
 
   local priv_key_path pub_key_path conf_path
   priv_key_path="/etc/wireguard/${wg_iface}.key"
@@ -171,8 +214,29 @@ module_apply() {
 
   echo "Installing WireGuard packages"
   apt_update_once
-  apt-get -y -qq install wireguard >/dev/null
+  apt-get -y -qq install wireguard wireguard-tools >/dev/null
   require_cmd wg
+
+  if [[ "$wg_backend" == "userspace" ]]; then
+    selected_backend="userspace"
+  elif [[ "$wg_backend" == "kernel" ]]; then
+    if ! wireguard_kernel_supported; then
+      echo "ERROR: WireGuard kernel backend requested but kernel support is unavailable" >&2
+      echo "Set WG_BACKEND=auto or WG_BACKEND=userspace to enable wireguard-go fallback." >&2
+      exit 1
+    fi
+    selected_backend="kernel"
+  elif wireguard_kernel_supported; then
+    selected_backend="kernel"
+  else
+    selected_backend="userspace"
+  fi
+
+  if [[ "$selected_backend" == "userspace" ]]; then
+    echo "WireGuard kernel backend not available; enabling userspace backend (wireguard-go)"
+    apt-get -y -qq install wireguard-go >/dev/null
+    require_cmd wireguard-go
+  fi
 
   install -d -m 0700 /etc/wireguard
 
@@ -230,6 +294,8 @@ Endpoint = ${endpoint_host}:${endpoint_port}
 PersistentKeepalive = ${keepalive}
 EOF
 
+  configure_wg_quick_backend "$wg_iface" "$selected_backend"
+
   systemctl enable --now "wg-quick@${wg_iface}"
 
   local run_test="0"
@@ -251,7 +317,7 @@ EOF
     ping -c 3 -W 2 "${gateway_ip}"
   fi
 
-  echo "OK: WireGuard configured (${wg_iface}, ${wg_address} -> ${endpoint_host}:${endpoint_port})"
+  echo "OK: WireGuard configured (${wg_iface}, ${wg_address} -> ${endpoint_host}:${endpoint_port}, backend=${selected_backend})"
 }
 
 module_verify() {
