@@ -1,54 +1,90 @@
 # server-bootstrap
 
-Bootstrap framework for fresh Ubuntu servers. It is now lifecycle-driven (`plan -> apply -> verify`), profile-aware, dependency-capable, and includes optional TUI + local Web GUI.
+Need to onboard many servers and do not want to repeat the same setup steps manually?
 
-## Highlights
+`server-bootstrap` gives you a profile-driven, module-based bootstrap flow that can be executed in one command.
+It is built for fast, repeatable server provisioning: SSH keys, Docker runtime, WireGuard client, unattended updates, time sync, and more.
 
-- Modular engine with `module_plan`, `module_apply`, `module_verify`
-- Dependency graph resolution with automatic ordering
+You pick a profile, pick modules, run one command, and let the script handle the rest (`plan -> apply -> verify`).
+
+## What You Get
+
+- Lifecycle execution model per module: `module_plan`, `module_apply`, `module_verify`
+- Dependency-aware module orchestration
 - Profile support via `profiles/*.env`
-- State tracking (`state.json`) + text/JSON event logs
-- Concurrency lock (`flock`) to prevent parallel runs
-- Safer SSH hardening with backup + `sshd -t` validation
-- WireGuard automation flags for CI (`WG_CONFIRM`, `WG_TEST`)
-- Webmin repo setup without executing remote setup scripts
+- Portable TUI wizard (no extra dependencies)
+- Optional local Web UI (Phase B)
+- Structured logging + JSON event log + state file
+- Safe lockfile handling to avoid parallel bootstrap runs
+- Release pinning for remote bootstrap through `BOOTSTRAP_VERSION`
 
-## Quick start
+## Typical Use Cases
 
-Interactive run:
+- New server onboarding with a consistent baseline
+- Repeated deployment across VPS fleets
+- Profile-driven setup (dev/prod/tenant-specific profiles)
+- Fast remote rollout over SSH with one-line commands
+- Controlled post-install verification
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s --
-```
+## Quick Start
 
-Short proxy form (interactive):
+### 1) Short proxy one-liner (recommended)
+
+Interactive wizard:
 
 ```bash
 sudo bash -c "$(curl -fsSL https://bootstrap.cocoit.cz)"
 ```
 
-Run all (non-interactive):
+If cache is suspected, force fresh fetch:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo BOOTSTRAP_INTERACTIVE=0 bash -s --
+sudo bash -c "$(curl -fsSL https://bootstrap.cocoit.cz?nocache=$(date +%s))"
 ```
 
-Short proxy form with args/env:
+### 2) Raw GitHub one-liner (no proxy)
 
 ```bash
-curl -fsSL https://bootstrap.cocoit.cz | sudo BOOTSTRAP_INTERACTIVE=0 bash -s --
-curl -fsSL https://bootstrap.cocoit.cz | sudo bash -s -- --plan --modules docker
+curl -fsSL https://raw.githubusercontent.com/mondychan/server-bootstrap/main/main.sh | sudo bash -s --
 ```
 
-## CLI actions
+### 3) Non-interactive one-liner (direct rollout)
 
 ```bash
-sudo ./main.sh --plan --modules docker,wireguard
-sudo ./main.sh --apply --profile prod --modules ssh-keys,webmin
-sudo ./main.sh --verify --modules docker
+curl -fsSL https://bootstrap.cocoit.cz | sudo BOOTSTRAP_INTERACTIVE=0 bash -s -- \
+  --apply --profile prod \
+  --modules ssh-keys,docker,wireguard,unattended-upgrades,time-sync
 ```
 
-## List modules/profiles
+Short proxy with explicit action/modules:
+
+```bash
+curl -fsSL https://bootstrap.cocoit.cz | sudo bash -s -- --plan --modules docker,wireguard
+```
+
+## Command Structure
+
+General form:
+
+```bash
+./main.sh --<action> [--profile <name>] [--modules <csv>] [--no-interactive]
+```
+
+Actions:
+
+- `--plan`: print what would be done (no changes)
+- `--apply`: run `plan`, then apply changes, then verify
+- `--verify`: run checks only (plus plan output for context)
+
+Examples:
+
+```bash
+sudo ./main.sh --plan --profile prod --modules ssh-keys,wireguard
+sudo ./main.sh --apply --profile prod --modules ssh-keys,webmin,docker
+sudo ./main.sh --verify --modules docker,time-sync
+```
+
+List metadata:
 
 ```bash
 ./main.sh --list
@@ -57,179 +93,156 @@ sudo ./main.sh --verify --modules docker
 ./main.sh --list-profiles-json
 ```
 
-## Profile usage
+## Profile-Driven Workflow
 
 Profiles are plain env files in `profiles/*.env`.
 
-Examples included:
+Included examples:
+
 - `profiles/dev.env`
 - `profiles/prod.env`
 
-Run with profile:
+Add your own profile (for example `profiles/forte.env`) and run:
 
 ```bash
-sudo ./main.sh --profile prod --modules ssh-keys,docker
+sudo ./main.sh --apply --profile forte --modules ssh-keys,wireguard,docker
+```
+
+You can also override any profile value at runtime:
+
+```bash
+sudo WG_ENDPOINT_HOST=vpn.example.net WG_ENDPOINT_PORT=3232 \
+  ./main.sh --apply --profile prod --modules wireguard
 ```
 
 ## TUI (Phase A)
 
-Portable TUI wizard is available without extra dependencies (pure Bash).
-In `auto` mode, bootstrap uses portable TUI when an interactive terminal is available.
+CLI/TUI is the primary operator path (headless-friendly).
 
-Use:
+- Default mode is portable Bash wizard (`BOOTSTRAP_TUI=auto`)
+- Force portable wizard: `BOOTSTRAP_TUI=portable` or `--tui-portable`
+- Disable TUI and use classic prompts: `BOOTSTRAP_TUI=0`
 
-- `auto`: enables portable TUI on interactive terminal
-- `portable`: force portable Bash wizard
-- Falls back to classic prompt UI
+Examples:
 
 ```bash
-# auto (default)
 sudo ./main.sh
-
-# force compatibility TUI (same behavior as auto in most terminals)
-sudo BOOTSTRAP_TUI=1 ./main.sh
-
-# force portable TUI
 sudo BOOTSTRAP_TUI=portable ./main.sh
-sudo ./main.sh --tui-portable
-
-# force classic prompts
-sudo BOOTSTRAP_TUI=0 ./main.sh
-```
-
-If your terminal renders broken/garbled UI, use:
-
-```bash
 sudo BOOTSTRAP_TUI=0 ./main.sh
 ```
 
 ## Web GUI (Phase B)
 
-Optional local ops panel (CLI is primary path for headless/remote environments):
+Optional local ops panel backed by the same `main.sh` actions.
 
 ```bash
 python3 gui/server.py --host 127.0.0.1 --port 8089
 # then open http://127.0.0.1:8089
 ```
 
-or
+or:
 
 ```bash
 bash gui/start.sh
 ```
 
-The Web GUI calls the same `main.sh` actions (`plan/apply/verify`) underneath.
-
-## Global environment variables
-
-- `BOOTSTRAP_DRY_RUN=1` skip apply stage (plan still runs)
-- `BOOTSTRAP_VERBOSE=1` verbose logs
-- `BOOTSTRAP_INTERACTIVE=0` disable prompts
-- `BOOTSTRAP_TUI=auto|portable|1|0` pick auto/portable/disabled TUI mode
-- `BOOTSTRAP_COLOR=auto|always|never` default `always`; colorized console logs (`ERROR/WARN/OK`), plain file logs
-- `BOOTSTRAP_LOG_DIR=/path`
-- `BOOTSTRAP_STATE_DIR=/path`
-- `BOOTSTRAP_LOCK_FILE=/path`
-- `BOOTSTRAP_CONTINUE_ON_ERROR=1` continue when a module fails
-
-## State and logging
-
-- Text log: `<log_dir>/server-bootstrap.log`
-- Event log (JSONL): `<log_dir>/events.jsonl`
-- State file: `<state_dir>/state.json`
-
-Default paths:
-- root: `/var/log/server-bootstrap`, `/var/lib/server-bootstrap`
-- non-root fallback: `/tmp/server-bootstrap`, `/tmp/server-bootstrap-state`
-
-## Module overview
+## Module Overview
 
 | Module ID | Purpose | Key env vars |
 | --- | --- | --- |
 | `ssh-keys` | Sync `authorized_keys` from GitHub via systemd timer + SSH hardening. | `GH_USER`, `USERNAME`, `INTERVAL_MIN`, `SSH_REQUIRE_SERVER`, `SSH_AUTO_INSTALL` |
 | `webmin` | Install Webmin from official repository, verify service. | `WEBMIN_PORT`, `WEBMIN_VERSION`, `WEBMIN_KEY_SHA256`, `WEBMIN_STRICT_KEY_CHECK` |
 | `docker` | Install Docker Engine + Compose plugin from official repo. | `DOCKER_HELLO` |
-| `wireguard` | WireGuard client setup to `vpn.cocoit.cz`. | `WG_ADDRESS`, `WG_INTERFACE`, `WG_CONFIRM`, `WG_TEST` |
+| `wireguard` | WireGuard client setup to configurable endpoint. | `WG_ADDRESS`, `WG_INTERFACE`, `WG_CONFIRM`, `WG_TEST`, `WG_ENDPOINT_HOST`, `WG_ENDPOINT_PORT`, `WG_PEER_PUBLIC_KEY`, `WG_ALLOWED_IPS`, `WG_PERSISTENT_KEEPALIVE`, `WG_DNS` |
 | `unattended-upgrades` | Enable automatic security updates via APT unattended-upgrades. | `UAU_AUTO_REBOOT`, `UAU_AUTO_REBOOT_TIME`, `UAU_REMOVE_UNUSED`, `UAU_UPDATE_PACKAGE_LISTS`, `UAU_UNATTENDED_UPGRADE` |
 | `time-sync` | Configure timezone and NTP sync via systemd-timesyncd. | `TS_TIMEZONE`, `TS_NTP_SERVERS`, `TS_FALLBACK_NTP`, `TS_STRICT_SYNC`, `TS_SYNC_TIMEOUT_SEC` |
 
-## Security note (Webmin key pinning)
+## Global Environment Variables
 
-For strict key pinning, set:
+- `BOOTSTRAP_DRY_RUN=1` skip apply stage (plan still runs)
+- `BOOTSTRAP_VERBOSE=1` verbose logs
+- `BOOTSTRAP_INTERACTIVE=0` disable prompts
+- `BOOTSTRAP_TUI=auto|portable|1|0` auto/portable/disabled TUI mode
+- `BOOTSTRAP_COLOR=auto|always|never` default `always`; colored console output
+- `BOOTSTRAP_LOG_DIR=/path` override log directory
+- `BOOTSTRAP_STATE_DIR=/path` override state directory
+- `BOOTSTRAP_LOCK_FILE=/path` override lock file location
+- `BOOTSTRAP_CONTINUE_ON_ERROR=1` continue when a module fails
 
-- `WEBMIN_STRICT_KEY_CHECK=1`
-- `WEBMIN_KEY_SHA256=<expected_sha256_of_jcameron-key.asc>`
+## State and Logging
 
-## Development quality gates
+- Text log: `<log_dir>/server-bootstrap.log`
+- Event log: `<log_dir>/events.jsonl`
+- State file: `<state_dir>/state.json`
 
-CI workflow runs:
+Default locations:
+
+- root: `/var/log/server-bootstrap`, `/var/lib/server-bootstrap`
+- non-root fallback: `/tmp/server-bootstrap`, `/tmp/server-bootstrap-state`
+
+## Security Notes
+
+- `ssh-keys` hardening uses backup + `sshd -t` validation before reload/restart.
+- `webmin` supports strict key checksum pinning:
+  - `WEBMIN_STRICT_KEY_CHECK=1`
+  - `WEBMIN_KEY_SHA256=<expected_sha256>`
+- `wireguard` supports non-interactive automation (`WG_CONFIRM=1`, `WG_TEST=0|1`).
+
+## Development Quality Gates
+
+CI runs:
+
 - `shellcheck`
-- `shfmt`
+- `shfmt` (2-space shell format)
 - `bats` tests
 
 ## Release Version Sync (Mandatory)
 
-When releasing a new version, keep these values synchronized:
+When releasing a new version, always keep these synchronized:
 
-1. `main.sh` -> `BOOTSTRAP_VERSION="<new_version>"`
-2. `VERSION` -> `<new_version>`
-3. `CHANGELOG.md` -> add section `[<new_version>]` with date and changes
-4. Git tag -> `v<new_version>` (annotated tag)
+1. `main.sh` -> `BOOTSTRAP_VERSION="<x.y.z>"`
+2. `VERSION` -> `<x.y.z>`
+3. `CHANGELOG.md` -> add section `[<x.y.z>]`
+4. Git tag -> `v<x.y.z>` (annotated tag)
 
-Why this is mandatory:
-- short bootstrap (`https://bootstrap.cocoit.cz`) downloads a pinned tarball from `main.sh` using `BOOTSTRAP_VERSION`
-- if `BOOTSTRAP_VERSION` is not bumped, users get an older release even when `main` has newer code
+Why this matters:
 
-Recommended release commands:
+- The short bootstrap URL (`https://bootstrap.cocoit.cz`) resolves script logic that pins tarball download by `BOOTSTRAP_VERSION`.
+- If version points are out of sync, users can receive older code.
+
+Release command template:
 
 ```bash
-# example for 0.2.6
 git add main.sh VERSION CHANGELOG.md
-git commit -m "release: v0.2.6"
+git commit -m "release: v<x.y.z>"
 git push origin main
-git tag -a v0.2.6 -m "Release v0.2.6"
-git push origin v0.2.6
+git tag -a v<x.y.z> -m "Release v<x.y.z>"
+git push origin v<x.y.z>
 ```
 
-Verification:
+Verify:
 
 ```bash
-git ls-remote origin refs/heads/main refs/tags/v0.2.6 refs/tags/v0.2.6^{}
+git ls-remote origin refs/heads/main refs/tags/v<x.y.z> refs/tags/v<x.y.z>^{}
 ```
 
-## Documentation
+## Script References
+
+- Web GUI launcher: `bash gui/start.sh`
+- Release helper: `bash scripts/release.sh`
+- Tests: `bats tests`
+
+## Documentation Map
 
 - Docs index: `docs/README.md`
-- CLI and lifecycle: `docs/cli.md`
-- Module contract and module usage: `docs/modules.md`
-- TUI/Web GUI usage: `docs/gui.md`
-- Logging/state/lock operations: `docs/operations.md`
-- CI/versioning/release process: `docs/release.md`
-
-## Script usage reference
-
-GUI launcher:
-
-```bash
-bash gui/start.sh
-```
-
-Release helper:
-
-```bash
-bash scripts/release.sh
-# or explicit version:
-bash scripts/release.sh 0.2.1
-```
-
-Test suite:
-
-```bash
-bats tests
-```
+- CLI/lifecycle: `docs/cli.md`
+- Modules/env vars: `docs/modules.md`
+- TUI/Web UI: `docs/gui.md`
+- Logging/state/locks: `docs/operations.md`
+- Release process: `docs/release.md`
 
 ## Notes
 
 - `apply` and `verify` require root (`sudo`) unless `BOOTSTRAP_DRY_RUN=1`.
-- Modules are designed for Ubuntu + systemd.
-- Tarball bootstrap prefers pinned tag URL and falls back to `main` when needed.
+- Modules are built for Ubuntu + systemd.
+- Remote bootstrap prefers pinned tag tarball and falls back to `main` if needed.

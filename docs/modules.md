@@ -74,9 +74,15 @@ Purpose:
 
 Key env vars:
 - `WG_INTERFACE` (default `wg0`)
-- `WG_ADDRESS` (required unless interactive prompt)
+- `WG_ADDRESS` (local WireGuard interface address for this peer; required unless interactive prompt)
 - `WG_CONFIRM` (`0` default, `1` for non-interactive approval)
 - `WG_TEST` (`ask`, `0`, `1`)
+- `WG_ENDPOINT_HOST` (default `vpn.cocoit.cz`)
+- `WG_ENDPOINT_PORT` (default `13231`)
+- `WG_PEER_PUBLIC_KEY` (default bundled peer key)
+- `WG_ALLOWED_IPS` (default `192.168.70.0/24`, list of IPv4/CIDR)
+- `WG_PERSISTENT_KEEPALIVE` (default `25`, range `0-65535`)
+- `WG_DNS` (optional DNS list for interface)
 
 Automation behavior:
 - CI/non-interactive runs should set `WG_CONFIRM=1`.
