@@ -9,14 +9,25 @@ module_env="GH_USER, USERNAME, INTERVAL_MIN, SSH_REQUIRE_SERVER, SSH_AUTO_INSTAL
 module_deps=()
 
 detect_ssh_service_name() {
-  if systemctl list-unit-files --type=service | grep -q '^sshd\.service'; then
-    printf 'sshd'
-    return 0
-  fi
-  if systemctl list-unit-files --type=service | grep -q '^ssh\.service'; then
-    printf 'ssh'
-    return 0
-  fi
+  local service_name unit_file_list
+  unit_file_list="$(
+    systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null ||
+      systemctl list-unit-files --no-legend --no-pager 2>/dev/null ||
+      true
+  )"
+
+  for service_name in sshd ssh; do
+    if [[ -n "$unit_file_list" ]] &&
+      printf '%s\n' "$unit_file_list" | grep -Eq "^${service_name}\\.service[[:space:]]"; then
+      printf '%s' "$service_name"
+      return 0
+    fi
+    if systemctl show -p LoadState --value "${service_name}.service" 2>/dev/null | grep -q '^loaded$'; then
+      printf '%s' "$service_name"
+      return 0
+    fi
+  done
+
   return 1
 }
 
@@ -120,10 +131,9 @@ harden_sshd_config() {
     fi
   fi
 
-  if systemctl list-unit-files --type=service | grep -q '^sshd\.service'; then
-    systemctl reload sshd || systemctl restart sshd
-  elif systemctl list-unit-files --type=service | grep -q '^ssh\.service'; then
-    systemctl reload ssh || systemctl restart ssh
+  local ssh_service_name
+  if ssh_service_name="$(detect_ssh_service_name)"; then
+    systemctl reload "$ssh_service_name" || systemctl restart "$ssh_service_name"
   else
     echo "WARN: ssh service unit not found; skipped reload" >&2
   fi
@@ -288,7 +298,9 @@ module_verify() {
   fi
 
   if [[ "$ssh_require_server" == "1" ]]; then
-    ensure_ssh_server_present
+    if ! ensure_ssh_server_present; then
+      exit 1
+    fi
   fi
 
   local home_dir script_path service_name timer_name ssh_dir auth_keys
