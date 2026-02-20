@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.18] - 2026-02-20
+
+### Fixed
+- Updated `forte` WireGuard profile values so release tarball uses intended peer settings:
+  - `WG_PEER_PUBLIC_KEY=qIvVJXHqQuYT2XMdqGiMrwO5DA7F0MCSk/bmbj1tolM=`
+  - `WG_ALLOWED_IPS="192.168.80.0/24"`
+- Hardened SSH service detection in `ssh-keys` module to recognize both `ssh.service` and `sshd.service` reliably across distributions.
+- Fixed `ssh-keys` verify stage to return non-zero when SSH server prerequisites are missing (prevents false `Completed successfully`).
+
 ## [0.2.17] - 2026-02-15
 
 ### Changed
